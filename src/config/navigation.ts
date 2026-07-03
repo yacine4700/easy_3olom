@@ -65,8 +65,6 @@ export const navConfig: NavConfig = [
         href: "/methodology",
         icon: Route,
         description: "Teaching sequences per level",
-        badge: "Soon",
-        disabled: true,
       },
       {
         key: "learning-objectives",

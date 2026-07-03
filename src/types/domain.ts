@@ -40,8 +40,16 @@ export interface KnowledgeDocument extends BaseEntity {
 /* ------------------------------------------------------------------ */
 /* Module: Methodology                                                 */
 /* ------------------------------------------------------------------ */
+/**
+ * A teaching sequence/unit (démarche) for a given level. Bilingual to match
+ * the curriculum. `order` sequences units within a level so the assistant
+ * can reason about progression. Parent of Learning Objective.
+ */
 export interface Methodology extends BaseEntity {
   title: string;
+  titleAr: string;
+  description: string;
+  descriptionAr: string;
   level: EducationLevel;
   order: number;
   status: ContentStatus;

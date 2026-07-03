@@ -118,3 +118,42 @@ Stage Summary:
 - New operational learning: restart dev server after Prisma schema changes (db:push regenerates client on disk, but the running process caches the old module).
 - 3 of 8 modules now live (Dashboard, Knowledge Base, Glossary). Remaining: Methodology, Learning Objectives, Student Questions, Analytics, Settings.
 - Phase 3 complete and browser-verified. Awaiting approval for Phase 4.
+
+---
+Task ID: 4
+Agent: main (orchestrator)
+Task: Phase 4 — Methodology module (bilingual FR + AR teaching sequences with pedagogical ordering). Parent of Learning Objectives (Phase 5). Proves the vertical-slice pattern generalizes a 3rd time.
+
+Work Log:
+- Corrected Phase 3 recommendation order: built Methodology (parent) BEFORE Learning Objectives (child) so the child can have a populated relational dropdown instead of an empty one retrofitted later.
+- Updated Methodology domain type to bilingual (title, titleAr, description, descriptionAr) + level + order + status. `order` sequences units within a level for pedagogical progression.
+- Prisma: added Methodology model (bilingual fields + level/status strings + order int + indexes). db:push + db:generate. Restarted dev server (per Phase 3 learning — running process caches old Prisma client).
+- Validators lib/validators/methodology.ts: bilingual Zod schemas (FR fields + AR fields with AR messages) + order (int 0-9999). Reused level/status enums.
+- Service lib/services/methodology.ts: list (search across all 4 FR+AR fields), get, create, update, delete, getMethodologyStats (total/published/levels-covered). KEY ADDITION: stable level-rank ordering (1AS<2AS<3AS<AS) via in-JS sort after fetch — SQLite can't order by a lookup expression. Returns rows in pedagogical (level, order) order.
+- API routes: api/methodology/route.ts (GET, POST) + api/methodology/[id]/route.ts (GET, PATCH, DELETE).
+  - Hit one issue: the collection route.ts was NOT written initially (the Write tool's first attempt failed on missing dir, I created the dir + [id] route but forgot to re-write the collection route). Symptom: page rendered via server-side service call (8 rows) but client TanStack refetch hit 404 → create POST also 404'd. Fixed by writing the missing route.ts. Lesson: verify both route files exist after creating API dirs.
+- TanStack Query hooks hooks/queries/use-methodology.ts: useMethodologies (placeholderData), useCreate/Update/Delete with cache invalidation + toasts.
+- UI components in components/methodology/: methodology-form (bilingual grid + order number field, dir=rtl for AR), methodology-dialog (create/edit, 2xl width), delete-methodology-dialog (shows FR/AR title), columns (# order badge + bilingual sequence title + level/status shared badges + row actions), methodology-table (TanStack, NO default client sort — preserves server pedagogical order; user can still click headers to re-sort), methodology-table-toolbar (search + level/status + New), methodology-stats (Total/Published/Levels covered), methodology-view (orchestrator).
+  - KEY FIX: initial client SortingState was [{order, asc}] which re-sorted by order across all levels, breaking the server's level-then-order pedagogical sequence. Changed to [] so server order is preserved. Verified: 1AS(1,2,3)→2AS(1,2)→3AS(1,2,3)→AS(1).
+- Page app/(admin)/methodology/page.tsx: Server Component, parallel fetch initial list + stats.
+- Seed scripts/seed-methodology.ts: 8 real bilingual teaching sequences across 1AS(2)/2AS(2)/3AS(3)/AS(1), ordered, mixed statuses.
+- Enabled nav item in config/navigation.ts.
+- Lint: 0 errors, 6 warnings (same React Compiler notes on RHF watch() + TanStack useReactTable(), now across 3 modules — inherent to requested libraries).
+
+Self-verification (Agent Browser):
+- /methodology renders "Methodology · Easy 3olom Admin", no errors after route fix + dev restart.
+- 8 seeded sequences; pedagogical ordering VERIFIED: 1AS(1,2)→2AS(1,2)→3AS(1,2,3)→AS(1).
+- Bilingual RTL verified: 8 [dir=rtl] elements; FR "La cellule..." + AR "الخلية: الوحدة..." stacked.
+- CREATE: New dialog → filled bilingual + order 3 + Published → submit (POST 201) → new sequence "La reproduction..." inserted at 1AS position 3. No errors.
+- UPDATE: Edit prefilled (bilingual + order 3 + Published) → changed order→1 + status→Draft → Save (PATCH) → status shows Draft, reordering applied. 
+- DELETE: row actions → Delete → AlertDialog shows FR/AR title → confirm (DELETE 204) → removed, back to 8 rows.
+- Nav active state correct; mobile (375px) renders, footer pinned (gapBelow=0).
+- Regression: KB module intact after shared-badge + new module additions (8 rows, no errors).
+
+Stage Summary:
+- 4 of 8 modules now live (Dashboard, Knowledge Base, Glossary, Methodology). The vertical-slice pattern now proven 3× (KB, Glossary, Methodology) — it scales cleanly.
+- New pattern addition: stable server-side ordering when SQLite can't express the sort (level-rank lookup). Client table preserves server order by defaulting to empty SortingState.
+- Bilingual FR+AR + RTL pattern now consistent across 2 modules (Glossary, Methodology); ready for reuse in Learning Objectives.
+- Methodology is the PARENT of Learning Objectives — Phase 5 will add a real relational dropdown (objectives → methodology) demonstrating the first parent-child module relationship.
+- Two operational learnings logged: (1) restart dev after Prisma schema changes; (2) verify both collection + [id] route files exist after creating API dirs.
+- Phase 4 complete and browser-verified. Awaiting approval for Phase 5 (Learning Objectives — first relational module).

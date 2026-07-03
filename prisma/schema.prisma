@@ -52,6 +52,26 @@ model KnowledgeDocument {
   @@index([status])
 }
 
+/// A bilingual teaching sequence/unit (démarche) for a given level.
+/// Parent of LearningObjective (built in a later phase). `order` sequences
+/// units within a level. level/status are plain strings (no SQLite enums),
+/// constrained at the Zod layer.
+model Methodology {
+  id           String   @id @default(cuid())
+  title        String
+  titleAr      String
+  description  String
+  descriptionAr String
+  level        String // EducationLevel union
+  status       String // ContentStatus union
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([level])
+  @@index([status])
+}
+
 /// A bilingual (FR + AR) glossary term for the Natural & Life Sciences
 /// curriculum. `term`/`definition` are French (source textbooks),
 /// `termAr`/`definitionAr` are Arabic (instruction language).
