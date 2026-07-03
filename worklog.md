@@ -157,3 +157,26 @@ Stage Summary:
 - Methodology is the PARENT of Learning Objectives — Phase 5 will add a real relational dropdown (objectives → methodology) demonstrating the first parent-child module relationship.
 - Two operational learnings logged: (1) restart dev after Prisma schema changes; (2) verify both collection + [id] route files exist after creating API dirs.
 - Phase 4 complete and browser-verified. Awaiting approval for Phase 5 (Learning Objectives — first relational module).
+
+---
+Task ID: FIX-1
+Agent: main (orchestrator)
+Task: Solve console errors (cross-origin warning + React 19 hydration mismatch).
+
+Work Log:
+- Issue 1 — Next.js cross-origin dev warning: "Cross origin request detected from preview-chat-*.space-z.ai to /_next/* resource". The preview panel loads resources from a different subdomain (preview-chat-{session-id}.space-z.ai). Next.js 16 requires explicitly allowlisting these origins.
+  - Fix: added `allowedDevOrigins: ["*.space-z.ai"]` to next.config.ts. Wildcard covers the per-session subdomain.
+  - Required dev server restart (next.config changes need restart).
+  - Verified: warning gone from dev.log.
+
+- Issue 2 — React 19 hydration mismatch on Radix DropdownMenuTrigger (and SelectTrigger). Error: "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties." Diff showed `id="radix-_R_1qqitplb_"` (server) vs `id="radix-_R_emitplb_"` (client) — different useId tree paths. Appeared on ALL pages including Dashboard (shell-only), confirming root cause in the shell not module content.
+  - Root cause: `Topbar` and `UserMenu` were Server Components rendered as children of `SidebarInset` (a Client Component). In Next.js App Router, Server Components are "transparent" in the CLIENT React tree (they don't create React nodes), but during SSR they DO occupy tree positions. This asymmetry shifts every downstream `useId()` output, causing the Radix ID mismatch.
+  - First attempt: changed `useIsMobile` hook from `useState(undefined)` → `useState(false)` for deterministic initial value. Did NOT fix the issue (the `!!undefined === false` return was already deterministic).
+  - Actual fix: added `"use client"` to `Topbar` and `UserMenu`. Now the tree is Client → Client → Client (SidebarInset → Topbar → UserMenu → DropdownMenu) with no Server Component boundary, so useId paths are identical on server and client.
+  - Verified: hydration error gone on all 4 live pages (Dashboard, Knowledge Base, Glossary, Methodology). Console shows only standard React DevTools + HMR logs. Zero page errors. Dev log clean.
+  - Functionality regression check: UserMenu dropdown opens (Profile/Settings/Sign out), sidebar navigation works, table data renders (KB: 8 rows), no errors.
+
+Stage Summary:
+- Both console errors fully resolved. Console is now clean (only standard dev info logs).
+- Key learning: when a Server Component is rendered as a child of a Client Component, its Radix `useId` outputs can mismatch between SSR and hydration. Components that contain Radix primitives (DropdownMenu, Select, Tooltip, etc.) should be Client Components when they're inside Client Component trees. This is a React 19 + Next.js App Router + Radix interaction.
+- Lint: 0 errors, 6 warnings (unchanged React Compiler notes).
