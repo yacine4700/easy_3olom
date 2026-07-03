@@ -11,8 +11,7 @@ const STATUS_STYLES: Record<
   draft: {
     label: "Draft",
     icon: FileEdit,
-    className:
-      "border-transparent bg-muted text-muted-foreground",
+    className: "border-transparent bg-muted text-muted-foreground",
   },
   review: {
     label: "In review",
@@ -34,7 +33,11 @@ const STATUS_STYLES: Record<
   },
 };
 
-/** Colored status badge with an icon, used in tables and headers. */
+/**
+ * Colored status badge with an icon.
+ * Shared across modules (Knowledge Base, Glossary, …) — anything that
+ * uses the ContentStatus lifecycle.
+ */
 export function StatusBadge({ status }: { status: ContentStatus }) {
   const config = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
   const Icon = config.icon;

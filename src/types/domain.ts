@@ -60,10 +60,18 @@ export interface LearningObjective extends BaseEntity {
 /* ------------------------------------------------------------------ */
 /* Module: Glossary                                                    */
 /* ------------------------------------------------------------------ */
+/**
+ * Bilingual glossary term. Algerian secondary science is taught bilingually
+ * (French textbooks + Arabic instruction), so both languages are first-class
+ * to feed the RAG assistant that answers students in Arabic.
+ */
 export interface GlossaryTerm extends BaseEntity {
   term: string;
+  termAr: string;
   definition: string;
+  definitionAr: string;
   level: EducationLevel;
+  status: ContentStatus;
 }
 
 /* ------------------------------------------------------------------ */

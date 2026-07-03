@@ -51,3 +51,24 @@ model KnowledgeDocument {
   @@index([level])
   @@index([status])
 }
+
+/// A bilingual (FR + AR) glossary term for the Natural & Life Sciences
+/// curriculum. `term`/`definition` are French (source textbooks),
+/// `termAr`/`definitionAr` are Arabic (instruction language).
+///
+/// As with KnowledgeDocument, `level` and `status` are plain strings here
+/// (SQLite has no enums) and constrained at the Zod validator layer.
+model GlossaryTerm {
+  id           String   @id @default(cuid())
+  term         String
+  termAr       String
+  definition   String
+  definitionAr String
+  level        String // EducationLevel union
+  status       String // ContentStatus union
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([level])
+  @@index([status])
+}

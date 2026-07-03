@@ -16,22 +16,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LevelBadge } from "@/components/shared/level-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
-import type { KnowledgeDocument } from "@/types/domain";
+import type { GlossaryTerm } from "@/types/domain";
 
-/** Actions available on each row; the table component supplies handlers. */
-export interface RowActions {
-  onEdit: (document: KnowledgeDocument) => void;
-  onDelete: (document: KnowledgeDocument) => void;
+export interface TermRowActions {
+  onEdit: (term: GlossaryTerm) => void;
+  onDelete: (term: GlossaryTerm) => void;
 }
 
-/** Cell that renders the row actions dropdown. Kept here so columns stay
- *  colocated with the data they describe. */
 function RowActionsCell({
-  document,
+  term,
   actions,
 }: {
-  document: KnowledgeDocument;
-  actions: RowActions;
+  term: GlossaryTerm;
+  actions: TermRowActions;
 }) {
   return (
     <div className="text-right">
@@ -47,14 +44,14 @@ function RowActionsCell({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => actions.onEdit(document)}>
+          <DropdownMenuItem onClick={() => actions.onEdit(term)}>
             <Pencil className="size-4" />
             Edit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
-            onClick={() => actions.onDelete(document)}
+            onClick={() => actions.onDelete(term)}
           >
             <Trash2 className="size-4" />
             Delete
@@ -65,10 +62,10 @@ function RowActionsCell({
   );
 }
 
-/** Build the column definitions. Needs `actions` for the last column. */
-export function getColumns(
-  actions: RowActions,
-): ColumnDef<KnowledgeDocument>[] {
+/** Build the column definitions for the glossary table. */
+export function getTermColumns(
+  actions: TermRowActions,
+): ColumnDef<GlossaryTerm>[] {
   return [
     {
       id: "select",
@@ -78,9 +75,7 @@ export function getColumns(
             table.getIsAllPageRowsSelected() ||
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
-          onCheckedChange={(value) =>
-            table.toggleAllPageRowsSelected(!!value)
-          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
         />
       ),
@@ -96,16 +91,32 @@ export function getColumns(
       size: 36,
     },
     {
-      accessorKey: "title",
-      header: "Title",
+      accessorKey: "term",
+      header: "Term (FR)",
       cell: ({ row }) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{row.original.title}</span>
-          <span className="text-muted-foreground max-w-[28ch] truncate text-xs">
-            {row.original.source}
+          <span className="font-medium">{row.original.term}</span>
+          <span
+            dir="rtl"
+            className="text-muted-foreground truncate text-xs"
+            lang="ar"
+          >
+            {row.original.termAr}
           </span>
         </div>
       ),
+    },
+    {
+      id: "definition",
+      header: "Definition",
+      cell: ({ row }) => (
+        <div className="max-w-[42ch]">
+          <p className="text-muted-foreground truncate text-xs">
+            {row.original.definition}
+          </p>
+        </div>
+      ),
+      enableSorting: false,
     },
     {
       accessorKey: "level",
@@ -118,29 +129,6 @@ export function getColumns(
       header: "Status",
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
       size: 140,
-    },
-    {
-      accessorKey: "chunkCount",
-      header: "Chunks",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground tabular-nums">
-          {row.original.chunkCount}
-        </span>
-      ),
-      size: 80,
-    },
-    {
-      accessorKey: "embeddingReady",
-      header: "Embeddings",
-      cell: ({ row }) =>
-        row.original.embeddingReady ? (
-          <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-            Ready
-          </span>
-        ) : (
-          <span className="text-muted-foreground text-xs">Pending</span>
-        ),
-      size: 110,
     },
     {
       accessorKey: "updatedAt",
@@ -157,7 +145,7 @@ export function getColumns(
     {
       id: "actions",
       cell: ({ row }) => (
-        <RowActionsCell document={row.original} actions={actions} />
+        <RowActionsCell term={row.original} actions={actions} />
       ),
       size: 56,
       enableSorting: false,

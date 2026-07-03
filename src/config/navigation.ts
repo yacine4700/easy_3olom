@@ -52,8 +52,6 @@ export const navConfig: NavConfig = [
         href: "/glossary",
         icon: BookText,
         description: "Domain terminology and definitions",
-        badge: "Soon",
-        disabled: true,
       },
     ],
   },

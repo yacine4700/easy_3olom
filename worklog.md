@@ -69,3 +69,52 @@ Stage Summary:
 - Clean Architecture honored: UI never imports Prisma; only `services/*` touches the DB. Swapping to Supabase = re-implement `services/knowledge-base.ts` only.
 - Server-Component-first: pages fetch initial data server-side (instant first paint) then hydrate to interactive TanStack Query CRUD on client.
 - Verification covers the full CRUD golden path + filters + search + responsive + footer. Phase 2 complete and browser-verified. Awaiting approval for Phase 3.
+
+---
+Task ID: 3
+Agent: main (orchestrator)
+Task: Phase 3 — Glossary module (bilingual FR + AR). Reuse the Phase 2 vertical-slice pattern to validate it generalizes; add justified bilingual domain fields.
+
+Work Log:
+- Architecture decision: Glossary is bilingual (FR term/definition + AR term/definition). Justified — Algerian secondary science is taught bilingually (French textbooks, Arabic instruction); glossary must serve both to feed the Arabic-answering RAG assistant.
+- Updated `GlossaryTerm` domain type to bilingual (term, termAr, definition, definitionAr, level, status).
+- Prisma: added `GlossaryTerm` model (term, termAr, definition, definitionAr, level, status + timestamps, indexes on level/status). `bun run db:push` applied + `db:generate`.
+- Refactor: extracted `status-badge.tsx` + `level-badge.tsx` from `components/knowledge-base/` → `components/shared/` (now reused by KB + Glossary). Updated KB `columns.tsx` import; deleted KB-local copies. Regression-verified KB still renders (8 rows, badges intact).
+- Validators `lib/validators/glossary.ts`: bilingual Zod schemas (FR fields with FR messages, AR fields with AR messages + 2000-char cap). Reused level/status enums from constants.
+- Service `lib/services/glossary.ts`: list (search across ALL 4 fields — FR+AR term+definition — so an Arabic query finds French-sourced content and vice versa), get, create, update, delete, getGlossaryStats. Repository pattern, only file touching Prisma for this module.
+- API routes: `api/glossary/route.ts` (GET list, POST create) + `api/glossary/[id]/route.ts` (GET, PATCH, DELETE). All Zod-validated.
+- TanStack Query hooks `hooks/queries/use-glossary.ts`: useGlossaryTerms (placeholderData), useCreate/Update/Delete with cache invalidation + sonner toasts. Colocated keys.
+- UI components in `components/glossary/`:
+  - `term-form.tsx`: RHF + Zod, bilingual grid; Arabic fields use `dir="rtl"` + `lang="ar"` for correct rendering/input direction; Arabic error messages also `dir="rtl"`.
+  - `term-dialog.tsx` (create/edit in one, 2xl width for bilingual grid) + `delete-term-dialog.tsx` (shows both FR + AR term in confirmation).
+  - `columns.tsx`: term cell shows FR (medium) + AR (muted, dir=rtl, lang=ar) stacked; truncated definition; level/status shared badges; row actions.
+  - `terms-table.tsx`: TanStack Table (sort by term asc default, paginate, select, skeleton/empty states).
+  - `terms-table-toolbar.tsx`: search (placeholder "Search FR or AR…") + level/status filters + Clear + brand "New term".
+  - `glossary-stats.tsx`: 3 cards (Total terms, Published, Bilingual FR+AR with Languages icon).
+  - `glossary-view.tsx`: client orchestrator (debounced search, dialogs).
+- Page `app/(admin)/glossary/page.tsx`: Server Component, parallel fetch initial list + stats, header with "FR · AR" badge + Arabic subject subtitle.
+- Seed `scripts/seed-glossary.ts`: 12 real bilingual biology terms (Cellule/خلية, ADN/الحمض النووي..., Photosynthèse/التركيب الضوئي, Mitose/الانقسام المتساوي, Méiose/الانقسام المنصف, Chromosome/صبغي, Enzyme/أنزيم, Membrane plasmique/الغشاء البلازمي, Mitochondrie/المتقدرة, Génome/المجموع المورثي, Osmose/التناضح, Ribosome/الريبوزوم) with full FR+AR definitions, mixed levels/statuses.
+- Enabled nav item in `config/navigation.ts`.
+- Hit one issue: dev server cached the pre-regeneration Prisma Client → `db.glossaryTerm` undefined → 500. Fixed by restarting dev server (kill + nohup bun run dev). Root cause: long-running Node process caches the old @prisma/client module; `db:push` regenerates on disk but the running process keeps the stale import. Lesson for future schema additions: restart dev server after db:push.
+- Lint: 0 errors, 4 warnings (same React Compiler notes on RHF watch() + TanStack useReactTable(), now across KB + Glossary forms/tables — inherent to requested libraries).
+
+Self-verification (Agent Browser):
+- /glossary renders with title "Glossary · Easy 3olom Admin", no runtime/console errors after dev restart.
+- 12 seeded terms paginate (10 on page 1, 2 on page 2), 3 stat cards render.
+- RTL verified: 10 [dir=rtl] elements in table; first row shows FR "ADN" + AR "الحمض النووي الريبي منقوص الأكسجين" stacked.
+- CREATE: New term dialog → filled bilingual (Respiration cellulaire / التنفس الخلوي + FR/AR definitions) → set Published → submit → term appears on page 2 (alphabetical). No errors.
+- UPDATE: row actions → Edit → dialog prefilled with all bilingual values (FR + AR including RTL) → changed status Published→Draft + updated AR definition → Save → status shows "Draft". PATCH 200.
+- BILINGUAL SEARCH: searched Arabic "خلية" → returned 4 related terms (Cellule + 3 whose AR definitions mention خلية). Proves cross-language search across all 4 fields. Then searched "Respiration" → 2 results (Mitochondrie via definition match + Respiration cellulaire).
+- DELETE: row actions → Delete → AlertDialog shows "Cellule / خلية" → canceled (preserved seed). Then deleted test "Respiration cellulaire" → confirmed removed (filtered search drops to 1). DELETE 204.
+- Nav active state correct on Glossary + Dashboard; navigation works both ways.
+- Regression: KB module still fully functional after shared-badge refactor (8 rows, status/level badges render, no errors).
+- Mobile (375px): glossary renders, footer pinned (gapBelow=0).
+- dev.log confirms full request chain incl. Arabic URL-encoded search (search=%D8%AE%D9%84%D9%8A%D8%A9 200).
+
+Stage Summary:
+- Validated the Phase 2 vertical-slice pattern generalizes: Glossary shipped faster by mirroring schema→service→validators→API→hooks→components→page structure. Each future module follows the same skeleton.
+- Shared badge extraction (components/shared/) prevents duplication — first concrete DRY win across modules.
+- Bilingual FR+AR with proper RTL rendering is now a proven pattern reusable for Student Questions (Arabic student queries + FR/AR answers) and any future bilingual content.
+- New operational learning: restart dev server after Prisma schema changes (db:push regenerates client on disk, but the running process caches the old module).
+- 3 of 8 modules now live (Dashboard, Knowledge Base, Glossary). Remaining: Methodology, Learning Objectives, Student Questions, Analytics, Settings.
+- Phase 3 complete and browser-verified. Awaiting approval for Phase 4.
