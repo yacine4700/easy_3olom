@@ -30,3 +30,24 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// A RAG source document managed by the Knowledge Base module.
+///
+/// Note: SQLite has no native enum type, so `level` and `status` are stored
+/// as strings and constrained at the Zod validator layer (single source of
+/// truth in `src/lib/validators/knowledge-base.ts`). The service layer maps
+/// these to the typed union aliases defined in `src/types/domain.ts`.
+model KnowledgeDocument {
+  id             String   @id @default(cuid())
+  title          String
+  source         String
+  level          String // EducationLevel union: "1AS" | "2AS" | "3AS" | "AS"
+  status         String // ContentStatus union: "draft" | "review" | "published" | "archived"
+  chunkCount     Int      @default(0)
+  embeddingReady Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([level])
+  @@index([status])
+}

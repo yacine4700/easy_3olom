@@ -45,8 +45,6 @@ export const navConfig: NavConfig = [
         href: "/knowledge-base",
         icon: Library,
         description: "Manage RAG source documents and chunks",
-        badge: "Soon",
-        disabled: true,
       },
       {
         key: "glossary",
