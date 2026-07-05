@@ -392,3 +392,33 @@ Work Log:
 Stage Summary:
 - Full rebuild complete. App is back to: Arabic RTL + Supabase (existing tables) + Webhook writes (KB/Glossary/Methodology) + DB direct (Settings/Student Questions).
 - Architecture: reads from Supabase, writes via webhook (n8n handles DB + RAG processing), settings in DB directly.
+
+---
+Task ID: KB-FORM-REDESIGN
+Agent: main (orchestrator)
+Task: Redesign KB form — add level field, domain/unit dropdowns, reorder fields, rename button, create taxonomy manager.
+
+Work Log:
+- Created taxonomy service (src/lib/services/taxonomy.ts): stores domains/units per level as JSON in settings table (key: "knowledge.taxonomy"). Structure: { "3AS": { domains: [], units: {} }, ... }
+- Created constants file (src/lib/constants/taxonomy.ts): EducationLevelKey, LEVEL_LABELS, TaxonomyData — separated from service to avoid importing supabase client into client components.
+- Created API route (src/app/api/taxonomy/route.ts): GET + PUT.
+- Created hook (src/hooks/queries/use-taxonomy.ts): useTaxonomy + useUpdateTaxonomy.
+- Updated KB validator: added `level` field (default "3AS").
+- Updated domain type: added `level` to KnowledgeDocument.
+- Updated KB service: includes `level` in webhook payload for create/update.
+- Rewrote document-form.tsx with new field order: 1) المستوى الدراسي (dropdown, default 3AS), 2) المجال (dropdown from taxonomy), 3) الوحدة (dropdown from taxonomy, disabled until domain selected), 4) النشاط, 5) المحتوى المعرفي, 6) الكلمات المفتاحية, 7) تعليمات للبوت. Button: "إضافة معرفة".
+- Updated dialog: "إضافة معرفة" / "تعديل المعرفة".
+- Updated toolbar button: "إضافة معرفة".
+- Created taxonomy-manager.tsx: management UI with level tabs (1/2/3 ثانوي), add/remove domains, expand domain to see/add/remove units. Added to settings page.
+- Fixed client-side crash: taxonomy constants were in services/taxonomy.ts which imports supabase.ts (server-only). Moved constants to separate file to prevent supabase client from being bundled into client components.
+- Lint: 0 errors, 6 warnings.
+
+Verification (Agent Browser):
+- KB page renders: "قاعدة المعرفة" ✓
+- Form opens with correct field order ✓
+- Level dropdown defaults to "3 ثانوي" ✓
+- Domain dropdown shows "— غير محدد —" (empty, no domains configured yet) ✓
+- Unit dropdown disabled until domain selected ✓
+- Button says "إضافة معرفة" ✓
+- Settings page shows "تصنيف المعرفة" section with 3 level tabs ✓
+- No errors ✓

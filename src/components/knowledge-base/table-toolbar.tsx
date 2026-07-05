@@ -65,7 +65,7 @@ export function TableToolbar({
         className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0"
       >
         <Plus className="size-4" />
-        وثيقة جديدة
+        إضافة معرفة
       </Button>
     </div>
   );

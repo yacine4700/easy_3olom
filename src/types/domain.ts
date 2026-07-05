@@ -9,11 +9,13 @@ export interface BaseEntity {
 }
 
 // knowledge_base table: id, domain, unit, title, keywords(jsonb), content, bot_instructions, created_at
+// level is sent via webhook (not stored in the table directly — n8n handles it)
 export interface KnowledgeDocument extends BaseEntity {
   title: string;
   content: string | null;
   domain: string | null;
   unit: string | null;
+  level: string | null;
   keywords: string[] | null;
   botInstructions: string | null;
 }

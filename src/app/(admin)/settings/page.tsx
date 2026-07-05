@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SettingsForm } from "@/components/settings/settings-form";
+import { TaxonomyManager } from "@/components/settings/taxonomy-manager";
 import { getAllSettings, type SettingsByGroup } from "@/lib/services/settings";
 import { checkSupabaseConnection } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -165,6 +166,9 @@ export default async function SettingsPage() {
       ) : null}
 
       {groups.length > 0 ? <SettingsForm groups={groups} /> : null}
+
+      {/* Taxonomy manager — domains/units per education level */}
+      {connection.connected ? <TaxonomyManager /> : null}
     </div>
   );
 }

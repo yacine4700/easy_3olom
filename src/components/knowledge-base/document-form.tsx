@@ -10,21 +10,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   createKnowledgeDocumentSchema,
   type CreateKnowledgeDocumentInput,
 } from "@/lib/validators/knowledge-base";
+import { useTaxonomy } from "@/hooks/queries/use-taxonomy";
+import { LEVEL_LABELS, type EducationLevelKey } from "@/lib/constants/taxonomy";
 import type { KnowledgeDocument } from "@/types/domain";
 
 interface DocumentFormProps {
-  /** When provided the form is in edit mode. */
   defaultValues?: Partial<KnowledgeDocument>;
   onSubmit: (values: CreateKnowledgeDocumentInput) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-/** Empty defaults shared by create mode and as a fallback. */
 const EMPTY: CreateKnowledgeDocumentInput = {
+  level: "3AS",
   title: "",
   content: null,
   domain: null,
@@ -33,44 +41,19 @@ const EMPTY: CreateKnowledgeDocumentInput = {
   botInstructions: null,
 };
 
-/**
- * Convert an array of keyword strings into a single comma-separated display
- * string (Arabic comma joins reads naturally in RTL).
- */
-function keywordsToText(keywords: string[] | null | undefined): string {
-  if (!keywords || keywords.length === 0) return "";
-  return keywords.join("، ");
-}
-
-/**
- * Parse a free-text input into a keywords array, splitting on both Latin and
- * Arabic commas and trimming empties.
- */
-function textToKeywords(text: string): string[] {
-  return text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-/**
- * Create/edit form for a knowledge document.
- *
- * Uses react-hook-form + zod; the same schema validates on both client and
- * server. The `keywords` field is stored as `string[]` on the domain, but
- * presented to the user as a single comma-separated text input — we bridge
- * the two with a local React state and `setValue`.
- */
 export function DocumentForm({
   defaultValues,
   onSubmit,
   onCancel,
   isSubmitting,
 }: DocumentFormProps) {
+  const { data: taxonomy } = useTaxonomy();
+
   const values: CreateKnowledgeDocumentInput = {
     ...EMPTY,
     ...(defaultValues
       ? {
+          level: (defaultValues.level as EducationLevelKey) ?? "3AS",
           title: defaultValues.title ?? "",
           content: defaultValues.content ?? null,
           domain: defaultValues.domain ?? null,
@@ -85,27 +68,32 @@ export function DocumentForm({
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<CreateKnowledgeDocumentInput>({
     resolver: zodResolver(createKnowledgeDocumentSchema),
     defaultValues: values,
   });
 
-  // Local text state mirrors the array field for display + editing.
+  const level = watch("level") ?? "3AS";
+  const domain = watch("domain");
+  const keywords = watch("keywords");
+
+  // Keywords local state (text input → array)
   const [keywordsText, setKeywordsText] = React.useState(
-    keywordsToText(defaultValues?.keywords),
+    Array.isArray(keywords) ? keywords.join("، ") : "",
   );
 
-  function handleKeywordsChange(
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) {
-    const text = event.target.value;
+  const domains = taxonomy?.[level]?.domains ?? [];
+  const units = (domain && taxonomy?.[level]?.units?.[domain]) ?? [];
+
+  function handleKeywordsChange(text: string) {
     setKeywordsText(text);
-    const arr = textToKeywords(text);
-    setValue("keywords", arr.length ? arr : null, {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+    const arr = text
+      .split(/[,،]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setValue("keywords", arr.length > 0 ? arr : null);
   }
 
   return (
@@ -114,11 +102,98 @@ export function DocumentForm({
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-4"
     >
+      {/* 1. المستوى الدراسي */}
       <div className="space-y-2">
-        <Label htmlFor="title">العنوان</Label>
+        <Label htmlFor="level">المستوى الدراسي</Label>
+        <Select
+          value={level}
+          onValueChange={(v) =>
+            setValue("level", v, { shouldValidate: true })
+          }
+        >
+          <SelectTrigger id="level" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.entries(LEVEL_LABELS) as [EducationLevelKey, string][]).map(
+              ([val, label]) => (
+                <SelectItem key={val} value={val}>
+                  {label}
+                </SelectItem>
+              ),
+            )}
+          </SelectContent>
+        </Select>
+        {errors.level && (
+          <p className="text-destructive text-xs">{errors.level.message}</p>
+        )}
+      </div>
+
+      {/* 2. المجال + 3. الوحدة */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="domain">المجال</Label>
+          <Select
+            value={domain ?? "none"}
+            onValueChange={(v) => {
+              setValue("domain", v === "none" ? null : v);
+              setValue("unit", null); // reset unit when domain changes
+            }}
+          >
+            <SelectTrigger id="domain" className="w-full">
+              <SelectValue placeholder="اختر المجال" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— غير محدد —</SelectItem>
+              {domains.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {domains.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              لا توجد مجالات مُضافة لهذا المستوى. أضفها من الإعدادات.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="unit">الوحدة</Label>
+          <Select
+            value={watch("unit") ?? "none"}
+            onValueChange={(v) =>
+              setValue("unit", v === "none" ? null : v)
+            }
+            disabled={!domain}
+          >
+            <SelectTrigger id="unit" className="w-full">
+              <SelectValue placeholder="اختر الوحدة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— غير محدد —</SelectItem>
+              {units.map((u) => (
+                <SelectItem key={u} value={u}>
+                  {u}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {domain && units.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              لا توجد وحدات مُضافة لهذا المجال.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 4. النشاط */}
+      <div className="space-y-2">
+        <Label htmlFor="title">النشاط</Label>
         <Input
           id="title"
-          placeholder="مثال: الخلية — وحدة الكائن الحي"
+          placeholder="مثال: نشاط 1 — تركيب البروتين"
           autoComplete="off"
           {...register("title")}
         />
@@ -127,80 +202,43 @@ export function DocumentForm({
         )}
       </div>
 
+      {/* 5. المحتوى المعرفي */}
       <div className="space-y-2">
-        <Label htmlFor="content">المحتوى</Label>
+        <Label htmlFor="content">المحتوى المعرفي</Label>
         <Textarea
           id="content"
-          placeholder="اكتب محتوى الوثيقة هنا…"
+          placeholder="اكتب المحتوى المعرفي هنا…"
           rows={6}
           {...register("content")}
         />
         {errors.content && (
-          <p className="text-destructive text-xs">
-            {errors.content.message as string}
-          </p>
+          <p className="text-destructive text-xs">{errors.content.message}</p>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="domain">المجال</Label>
-          <Input
-            id="domain"
-            placeholder="مثال: علم الخلية"
-            autoComplete="off"
-            {...register("domain")}
-          />
-          {errors.domain && (
-            <p className="text-destructive text-xs">
-              {errors.domain.message as string}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="unit">الوحدة</Label>
-          <Input
-            id="unit"
-            placeholder="مثال: الوحدة الأولى"
-            autoComplete="off"
-            {...register("unit")}
-          />
-          {errors.unit && (
-            <p className="text-destructive text-xs">
-              {errors.unit.message as string}
-            </p>
-          )}
-        </div>
-      </div>
-
+      {/* 6. الكلمات المفتاحية */}
       <div className="space-y-2">
         <Label htmlFor="keywords">الكلمات المفتاحية</Label>
         <Input
           id="keywords"
+          placeholder="كلمة1، كلمة2، كلمة3"
           value={keywordsText}
-          onChange={handleKeywordsChange}
-          placeholder="افصل بين الكلمات بفاصلة ، مثال: خلية، غشاء، نواة"
-          autoComplete="off"
+          onChange={(e) => handleKeywordsChange(e.target.value)}
         />
         <p className="text-muted-foreground text-xs">
-          افصل بين كل كلمة وأخرى بفاصلة (، أو ,).
+          افصل بين الكلمات بفاصلة
         </p>
       </div>
 
+      {/* 7. تعليمات للبوت */}
       <div className="space-y-2">
-        <Label htmlFor="botInstructions">تعليمات البوت</Label>
+        <Label htmlFor="botInstructions">تعليمات للبوت</Label>
         <Textarea
           id="botInstructions"
-          placeholder="تعليمات توجيهية تُمرَّر إلى المساعد عند استعمال هذه الوثيقة…"
-          rows={4}
+          placeholder="تعليمات توجيهية للمساعد الذكي…"
+          rows={3}
           {...register("botInstructions")}
         />
-        {errors.botInstructions && (
-          <p className="text-destructive text-xs">
-            {errors.botInstructions.message as string}
-          </p>
-        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -209,7 +247,7 @@ export function DocumentForm({
         </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
-          {defaultValues ? "حفظ التغييرات" : "إنشاء وثيقة"}
+          {defaultValues ? "حفظ التغييرات" : "إضافة معرفة"}
         </Button>
       </div>
     </form>

@@ -57,12 +57,12 @@ export function DocumentDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "تعديل الوثيقة" : "وثيقة جديدة"}
+            {isEdit ? "تعديل المعرفة" : "إضافة معرفة"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "عدّل بيانات هذه الوثيقة في قاعدة المعرفة."
-              : "أضف وثيقة جديدة إلى قاعدة المعرفة لتغذية المساعد."}
+              ? "عدّل بيانات هذه المعرفة."
+              : "أضف معرفة جديدة إلى قاعدة المعرفة لتغذية المساعد."}
           </DialogDescription>
         </DialogHeader>
 

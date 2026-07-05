@@ -8,12 +8,12 @@ const TABLE = "knowledge_base";
 type Row = {
   id: number | string; title: string | null; content: string | null;
   domain: string | null; unit: string | null; keywords: string[] | null;
-  bot_instructions: string | null; created_at?: string | null;
+  bot_instructions: string | null; created_at?: string | null; level?: string | null;
 };
 
 function toDomain(r: Row): KnowledgeDocument {
   return { id: String(r.id), title: r.title ?? "", content: r.content, domain: r.domain, unit: r.unit,
-    keywords: Array.isArray(r.keywords) ? r.keywords : null, botInstructions: r.bot_instructions, createdAt: r.created_at ?? undefined };
+    level: r.level ?? null, keywords: Array.isArray(r.keywords) ? r.keywords : null, botInstructions: r.bot_instructions, createdAt: r.created_at ?? undefined };
 }
 
 export interface ListResult { items: KnowledgeDocument[]; total: number; page: number; pageSize: number; }
@@ -48,22 +48,22 @@ export async function getKnowledgeBaseStats() {
 // WRITES → webhook only
 export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInput): Promise<KnowledgeDocument> {
   const result = await notifyWebhook("knowledge", "create", {
-    domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
+    level: input.level, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
     content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
   });
   if (!result.success) throw new Error(result.error);
   return { id: "", title: input.title, content: input.content ?? null, domain: input.domain ?? null,
-    unit: input.unit ?? null, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null, createdAt: new Date().toISOString() };
+    unit: input.unit ?? null, level: input.level, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null, createdAt: new Date().toISOString() };
 }
 
 export async function updateKnowledgeDocument(id: string, input: UpdateKnowledgeDocumentInput): Promise<KnowledgeDocument | null> {
   const result = await notifyWebhook("knowledge", "update", {
-    id, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
+    id, level: input.level ?? null, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
     content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
   });
   if (!result.success) throw new Error(result.error);
   return { id, title: input.title ?? "", content: input.content ?? null, domain: input.domain ?? null,
-    unit: input.unit ?? null, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null };
+    unit: input.unit ?? null, level: input.level ?? null, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null };
 }
 
 export async function deleteKnowledgeDocument(id: string): Promise<boolean> {
