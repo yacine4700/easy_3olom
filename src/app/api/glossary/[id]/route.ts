@@ -37,7 +37,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/glossary/[id] */
+/** PATCH /api/glossary/[id] (writes go through the webhook). */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -63,12 +63,13 @@ export async function PATCH(
     if (!term) return notFound("Term not found");
     return ok(term);
   } catch (error) {
-    console.error("[API] PATCH /api/glossary/[id] failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
 
-/** DELETE /api/glossary/[id] */
+/** DELETE /api/glossary/[id] (writes go through the webhook). */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -77,11 +78,11 @@ export async function DELETE(
     const { id } = await params;
     if (!isValidId(id)) return badRequest("Invalid id");
 
-    const deleted = await deleteGlossaryTerm(id);
-    if (!deleted) return notFound("Term not found");
+    await deleteGlossaryTerm(id);
     return noContent();
   } catch (error) {
-    console.error("[API] DELETE /api/glossary/[id] failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

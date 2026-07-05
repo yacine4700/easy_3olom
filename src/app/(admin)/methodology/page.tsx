@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Route } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { MethodologyStats } from "@/components/methodology/methodology-stats";
 import { MethodologyView } from "@/components/methodology/methodology-view";
 import {
@@ -10,15 +9,15 @@ import {
 } from "@/lib/services/methodology";
 
 export const metadata: Metadata = {
-  title: "Methodology",
+  title: "القواعد المنهاجية",
 };
 
 /**
- * /methodology — Methodology module (Phase 4).
+ * /methodology — Methodology rules module.
  *
- * Teaching sequences (démarches) per level, bilingual (FR + AR). Parent of
- * Learning Objectives (Phase 5). Server Component: fetches initial list +
- * stats in parallel, then hands off to the client `MethodologyView`.
+ * Server Component: fetches the first page + total count directly from the
+ * service layer (instant first paint), then hands off to the client
+ * `MethodologyView` which keeps data fresh via TanStack Query.
  */
 export default async function MethodologyPage() {
   const [initial, stats] = await Promise.all([
@@ -33,14 +32,12 @@ export default async function MethodologyPage() {
           <div className="bg-brand/10 text-brand flex size-7 items-center justify-center rounded-md">
             <Route className="size-4" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Methodology</h1>
-          <Badge variant="secondary" className="font-medium">
-            FR · AR
-          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            القواعد المنهاجية
+          </h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Bilingual teaching sequences (démarches) per level. Ordered units that
-          structure the curriculum&apos;s pedagogical progression.
+          القواعد التوجيهية لمساعد الذكاء الاصطناعي.
         </p>
       </div>
 

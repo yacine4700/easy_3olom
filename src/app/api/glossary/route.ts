@@ -12,7 +12,7 @@ import { created, ok, validate, serverError } from "@/lib/api";
 
 /**
  * GET /api/glossary
- * List bilingual terms with optional search/level/status filters + pagination.
+ * List glossary terms with optional search/domain/unit filters + pagination.
  */
 export async function GET(request: Request) {
   try {
@@ -25,8 +25,7 @@ export async function GET(request: Request) {
     );
     if (errorResponse) return errorResponse;
 
-    const result = await listGlossaryTerms(parsed);
-    return ok(result);
+    return ok(await listGlossaryTerms(parsed));
   } catch (error) {
     console.error("[API] GET /api/glossary failed:", error);
     return serverError();
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/glossary
- * Create a new bilingual glossary term.
+ * Create a new glossary term (writes go through the webhook).
  */
 export async function POST(request: Request) {
   try {
@@ -52,10 +51,10 @@ export async function POST(request: Request) {
     const [parsed, errorResponse] = validate(createGlossaryTermSchema, body);
     if (errorResponse) return errorResponse;
 
-    const term = await createGlossaryTerm(parsed);
-    return created(term);
+    return created(await createGlossaryTerm(parsed));
   } catch (error) {
-    console.error("[API] POST /api/glossary failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

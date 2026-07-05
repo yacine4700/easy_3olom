@@ -1,146 +1,63 @@
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import { notifyWebhook } from "@/lib/webhook";
 import type { GlossaryTerm } from "@/types/domain";
-import type {
-  CreateGlossaryTermInput,
-  ListGlossaryTermsQuery,
-  UpdateGlossaryTermInput,
-} from "@/lib/validators/glossary";
+import type { CreateGlossaryTermInput, ListGlossaryTermsQuery, UpdateGlossaryTermInput } from "@/lib/validators/glossary";
 
-/**
- * Glossary service (repository pattern).
- *
- * Mirrors the Knowledge Base service structure. Only place that touches
- * Prisma for this module — swapping persistence (e.g. to Supabase) means
- * re-implementing this file alone.
- */
+const TABLE = "glossary";
 
-type GlossaryTermRow = {
-  id: string;
-  term: string;
-  termAr: string;
-  definition: string;
-  definitionAr: string;
-  level: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
+type Row = { id: number | string; term: string | null; definition: string | null; unit: string | null; domain: string | null };
 
-function toDomain(row: GlossaryTermRow): GlossaryTerm {
-  return {
-    id: row.id,
-    term: row.term,
-    termAr: row.termAr,
-    definition: row.definition,
-    definitionAr: row.definitionAr,
-    level: row.level as GlossaryTerm["level"],
-    status: row.status as GlossaryTerm["status"],
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+function toDomain(r: Row): GlossaryTerm {
+  return { id: String(r.id), term: r.term ?? "", definition: r.definition, unit: r.unit, domain: r.domain };
 }
 
-export interface GlossaryListResult {
-  items: GlossaryTerm[];
-  total: number;
-  page: number;
-  pageSize: number;
+export interface GlossaryListResult { items: GlossaryTerm[]; total: number; page: number; pageSize: number; }
+
+export async function listGlossaryTerms(query: ListGlossaryTermsQuery): Promise<GlossaryListResult> {
+  const { search, domain, unit, page, pageSize } = query;
+  let req = supabase.from(TABLE).select("*", { count: "exact" });
+  if (domain) req = req.eq("domain", domain);
+  if (unit) req = req.eq("unit", unit);
+  if (search) req = req.or(`term.ilike.%${search}%,definition.ilike.%${search}%`);
+  req = req.order("term", { ascending: true }).range((page - 1) * pageSize, page * pageSize - 1);
+  const { data, error, count } = await req;
+  if (error) throw error;
+  return { items: (data as Row[]).map(toDomain), total: count ?? 0, page, pageSize };
 }
 
-export async function listGlossaryTerms(
-  query: ListGlossaryTermsQuery,
-): Promise<GlossaryListResult> {
-  const { search, level, status, page, pageSize } = query;
+export async function getGlossaryTerm(id: string): Promise<GlossaryTerm | null> {
+  const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).single();
+  if (error || !data) return null;
+  return toDomain(data as Row);
+}
 
-  // Search across both languages so a French OR Arabic query can find terms.
-  const where = {
-    ...(level ? { level } : {}),
-    ...(status ? { status } : {}),
-    ...(search
-      ? {
-          OR: [
-            { term: { contains: search } },
-            { termAr: { contains: search } },
-            { definition: { contains: search } },
-            { definitionAr: { contains: search } },
-          ],
-        }
-      : {}),
-  };
-
-  const [rows, total] = await Promise.all([
-    db.glossaryTerm.findMany({
-      where,
-      orderBy: { term: "asc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    db.glossaryTerm.count({ where }),
+export async function getGlossaryStats() {
+  const [totalRes, allRes] = await Promise.all([
+    supabase.from(TABLE).select("*", { count: "exact", head: true }),
+    supabase.from(TABLE).select("domain"),
   ]);
-
-  return {
-    items: rows.map(toDomain),
-    total,
-    page,
-    pageSize,
-  };
+  const domains = new Set((allRes.data ?? []).map((r: { domain: string | null }) => r.domain).filter(Boolean));
+  return { total: totalRes.count ?? 0, domains: domains.size };
 }
 
-export async function getGlossaryTerm(
-  id: string,
-): Promise<GlossaryTerm | null> {
-  const row = await db.glossaryTerm.findUnique({ where: { id } });
-  return row ? toDomain(row) : null;
-}
-
-export async function createGlossaryTerm(
-  input: CreateGlossaryTermInput,
-): Promise<GlossaryTerm> {
-  const row = await db.glossaryTerm.create({
-    data: {
-      term: input.term,
-      termAr: input.termAr,
-      definition: input.definition,
-      definitionAr: input.definitionAr,
-      level: input.level,
-      status: input.status,
-    },
+export async function createGlossaryTerm(input: CreateGlossaryTermInput): Promise<GlossaryTerm> {
+  const result = await notifyWebhook("glossary", "create", {
+    term: input.term, definition: input.definition ?? null, unit: input.unit ?? null, domain: input.domain ?? null,
   });
-  return toDomain(row);
+  if (!result.success) throw new Error(result.error);
+  return { id: "", term: input.term, definition: input.definition ?? null, unit: input.unit ?? null, domain: input.domain ?? null };
 }
 
-export async function updateGlossaryTerm(
-  id: string,
-  input: UpdateGlossaryTermInput,
-): Promise<GlossaryTerm | null> {
-  try {
-    const row = await db.glossaryTerm.update({ where: { id }, data: input });
-    return toDomain(row);
-  } catch {
-    return null;
-  }
+export async function updateGlossaryTerm(id: string, input: UpdateGlossaryTermInput): Promise<GlossaryTerm | null> {
+  const result = await notifyWebhook("glossary", "update", {
+    id, term: input.term ?? null, definition: input.definition ?? null, unit: input.unit ?? null, domain: input.domain ?? null,
+  });
+  if (!result.success) throw new Error(result.error);
+  return { id, term: input.term ?? "", definition: input.definition ?? null, unit: input.unit ?? null, domain: input.domain ?? null };
 }
 
 export async function deleteGlossaryTerm(id: string): Promise<boolean> {
-  try {
-    await db.glossaryTerm.delete({ where: { id } });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function getGlossaryStats(): Promise<{
-  total: number;
-  published: number;
-  bilingual: number;
-}> {
-  const [total, published] = await Promise.all([
-    db.glossaryTerm.count(),
-    db.glossaryTerm.count({ where: { status: "published" } }),
-  ]);
-  // "bilingual" = both Arabic fields non-empty. With the Zod schema requiring
-  // both, every row is bilingual by construction — kept as a stat placeholder
-  // for when Arabic becomes optional in a future iteration.
-  return { total, published, bilingual: total };
+  const result = await notifyWebhook("glossary", "delete", id);
+  if (!result.success) throw new Error(result.error);
+  return true;
 }

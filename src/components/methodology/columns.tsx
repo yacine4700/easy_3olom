@@ -1,12 +1,11 @@
 "use client";
 
-import * as React from "react";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,8 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LevelBadge } from "@/components/shared/level-badge";
-import { StatusBadge } from "@/components/shared/status-badge";
 import type { Methodology } from "@/types/domain";
 
 export interface MethodologyRowActions {
@@ -31,14 +28,14 @@ function RowActionsCell({
   actions: MethodologyRowActions;
 }) {
   return (
-    <div className="text-right">
+    <div className="text-start">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             className="size-8 text-muted-foreground"
-            aria-label="Open row actions"
+            aria-label="إجراءات الصف"
           >
             <MoreHorizontal className="size-4" />
           </Button>
@@ -46,7 +43,7 @@ function RowActionsCell({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => actions.onEdit(methodology)}>
             <Pencil className="size-4" />
-            Edit
+            تعديل
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -54,7 +51,7 @@ function RowActionsCell({
             onClick={() => actions.onDelete(methodology)}
           >
             <Trash2 className="size-4" />
-            Delete
+            حذف
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -76,14 +73,14 @@ export function getMethodologyColumns(
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label="تحديد الكل"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label="تحديد الصف"
         />
       ),
       enableSorting: false,
@@ -91,54 +88,45 @@ export function getMethodologyColumns(
       size: 36,
     },
     {
-      accessorKey: "order",
-      header: "#",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground inline-flex size-6 items-center justify-center rounded-md bg-muted text-xs font-medium tabular-nums">
-          {row.original.order}
-        </span>
-      ),
-      size: 56,
-    },
-    {
       accessorKey: "title",
-      header: "Sequence",
+      header: "العنوان",
       cell: ({ row }) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.original.title}</span>
-          <span
-            dir="rtl"
-            lang="ar"
-            className="text-muted-foreground truncate text-xs"
-          >
-            {row.original.titleAr}
-          </span>
+          {row.original.explanation ? (
+            <span className="text-muted-foreground line-clamp-1 max-w-[42ch] text-xs">
+              {row.original.explanation}
+            </span>
+          ) : null}
         </div>
       ),
     },
     {
-      accessorKey: "level",
-      header: "Level",
-      cell: ({ row }) => <LevelBadge level={row.original.level} />,
-      size: 90,
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      size: 140,
-    },
-    {
-      accessorKey: "updatedAt",
-      header: "Updated",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-xs">
-          {formatDistanceToNow(new Date(row.original.updatedAt), {
-            addSuffix: true,
-          })}
-        </span>
-      ),
-      size: 120,
+      id: "keywords",
+      header: "الكلمات المفتاحية",
+      cell: ({ row }) => {
+        const kws = row.original.keywords ?? [];
+        if (!kws.length) {
+          return (
+            <span className="text-muted-foreground text-xs">—</span>
+          );
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {kws.slice(0, 3).map((k, i) => (
+              <Badge key={`${k}-${i}`} variant="secondary" className="text-xs">
+                {k}
+              </Badge>
+            ))}
+            {kws.length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{kws.length - 3}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
     },
     {
       id: "actions",

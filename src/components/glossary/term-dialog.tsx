@@ -45,13 +45,15 @@ export function TermDialog({ open, onOpenChange, term }: TermDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit term" : "New term"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "تعديل المصطلح" : "مصطلح جديد"}
+          </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update this bilingual glossary term."
-              : "Add a new bilingual (FR + AR) glossary term."}
+              ? "عدّل بيانات هذا المصطلح في المعجم."
+              : "أضف مصطلحاً جديداً إلى المعجم يستعمله المساعد."}
           </DialogDescription>
         </DialogHeader>
 

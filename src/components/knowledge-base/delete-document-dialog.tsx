@@ -42,18 +42,17 @@ export function DeleteDocumentDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete document?</AlertDialogTitle>
+          <AlertDialogTitle>حذف الوثيقة؟</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete{" "}
+            سيتم حذف{" "}
             <span className="text-foreground font-medium">
               {document?.title}
             </span>{" "}
-            and remove it from the RAG knowledge base. This action cannot be
-            undone.
+            نهائياً من قاعدة المعرفة. لا يمكن التراجع عن هذا الإجراء.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={deleteMutation.isPending}
@@ -66,7 +65,7 @@ export function DeleteDocumentDialog({
               <Loader2 className="size-4 animate-spin" />
             )}
             <Trash2 className="size-4" />
-            Delete
+            حذف
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

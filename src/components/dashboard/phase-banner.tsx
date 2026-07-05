@@ -11,12 +11,12 @@ export function PhaseBanner() {
     <Alert className="border-brand/30 bg-brand/5">
       <Rocket className="text-brand size-4" />
       <AlertTitle className="text-sm font-medium">
-        Phase 1 — Foundation ready
+        المرحلة 1 — الأساس جاهز
       </AlertTitle>
       <AlertDescription className="text-muted-foreground text-xs leading-relaxed">
-        The application shell (sidebar, topbar, theming, providers, types and
-        navigation config) is in place. Modules below will be built
-        incrementally, starting with the Knowledge Base in the next phase.
+        الهيكل الأساسي للتطبيق (الشريط الجانبي، الشريط العلوي، نظام المظهر،
+        المزوّدات، الأنواع، وإعداد التنقّل) جاهز. الوحدات أدناه ستُبنى بشكل
+        تدريجي، بدءاً بقاعدة المعرفة في المرحلة التالية.
       </AlertDescription>
     </Alert>
   );

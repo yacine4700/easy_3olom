@@ -35,7 +35,7 @@ export function UserMenu() {
               {initials}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden truncate sm:inline">Admin</span>
+          <span className="hidden truncate sm:inline">المشرف</span>
           <ChevronsUpDown className="size-3.5 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
@@ -45,7 +45,7 @@ export function UserMenu() {
         className="w-56"
       >
         <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-foreground">Admin</span>
+          <span className="text-sm font-medium text-foreground">المشرف</span>
           <span className="text-xs font-normal text-muted-foreground">
             admin@easy3olom.dz
           </span>
@@ -53,16 +53,16 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <User className="size-4" />
-          Profile
+          الملف الشخصي
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Settings className="size-4" />
-          Settings
+          الإعدادات
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive focus:text-destructive">
           <LogOut className="size-4" />
-          Sign out
+          تسجيل الخروج
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

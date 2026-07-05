@@ -8,14 +8,13 @@ export function DashboardHeader() {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">الرئيسية</h1>
         <Badge variant="secondary" className="font-medium">
-          Phase 1
+          المرحلة 1
         </Badge>
       </div>
       <p className="text-muted-foreground text-sm">
-        Manage the RAG knowledge base for the Natural &amp; Life Sciences
-        assistant (علوم الطبيعة والحياة).
+        إدارة قاعدة معرفة RAG لمساعد مادة علوم الطبيعة والحياة.
       </p>
     </div>
   );

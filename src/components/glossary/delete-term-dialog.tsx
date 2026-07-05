@@ -42,16 +42,15 @@ export function DeleteTermDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete term?</AlertDialogTitle>
+          <AlertDialogTitle>حذف المصطلح؟</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete{" "}
-            <span className="text-foreground font-medium">{term?.term}</span>
-            <span className="text-muted-foreground"> / {term?.termAr}</span>{" "}
-            from the glossary. This action cannot be undone.
+            سيتم حذف{" "}
+            <span className="text-foreground font-medium">{term?.term}</span>{" "}
+            نهائياً من المعجم. لا يمكن التراجع عن هذا الإجراء.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={deleteMutation.isPending}
@@ -64,7 +63,7 @@ export function DeleteTermDialog({
               <Loader2 className="size-4 animate-spin" />
             )}
             <Trash2 className="size-4" />
-            Delete
+            حذف
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

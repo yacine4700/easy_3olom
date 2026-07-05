@@ -52,18 +52,15 @@ interface MethodologyTableProps {
 }
 
 /**
- * Data table for teaching sequences.
- * Default sort: level-rank then order (server already sorts that way, but
- * we keep a client sort state so column headers remain interactive).
+ * Data table for methodology rules.
+ * No default client sort — preserves server order (alphabetical by title).
+ * The user can still click sortable headers to re-sort manually.
  */
 export function MethodologyTable({
   methodologies,
   isLoading,
   actions,
 }: MethodologyTableProps) {
-  // No default client sort: the server already returns rows in pedagogical
-  // order (level-rank, then `order`). An empty initial sort preserves that
-  // server order; the user can still click headers to re-sort manually.
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -167,10 +164,10 @@ export function MethodologyTable({
                   <div className="flex flex-col items-center justify-center gap-2 text-center">
                     <Inbox className="text-muted-foreground/50 size-7" />
                     <p className="text-muted-foreground text-sm">
-                      No sequences found
+                      لا توجد قواعد
                     </p>
                     <p className="text-muted-foreground/70 text-xs">
-                      Try adjusting your filters or add a new sequence.
+                      حاول تعديل المرشحات أو أضف قاعدة جديدة.
                     </p>
                   </div>
                 </TableCell>
@@ -186,7 +183,7 @@ export function MethodologyTable({
           <span>
             {rows.length === 0
               ? "0"
-              : `${selectedCount} of ${methodologies.length} selected`}
+              : `${selectedCount} من ${methodologies.length} محدد`}
           </span>
           {selectedCount > 0 && (
             <Button
@@ -195,14 +192,14 @@ export function MethodologyTable({
               className="h-7 text-xs"
               onClick={() => setRowSelection({})}
             >
-              Clear
+              مسح
             </Button>
           )}
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-muted-foreground">Rows</span>
+            <span className="text-muted-foreground">الصفوف</span>
             <Select
               value={String(table.getState().pagination.pageSize)}
               onValueChange={(v) => table.setPageSize(Number(v))}
@@ -221,7 +218,7 @@ export function MethodologyTable({
           </div>
 
           <div className="text-muted-foreground text-xs">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            صفحة {table.getState().pagination.pageIndex + 1} من{" "}
             {table.getPageCount() || 1}
           </div>
 
@@ -232,7 +229,7 @@ export function MethodologyTable({
               className="size-8"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
-              aria-label="First page"
+              aria-label="الصفحة الأولى"
             >
               <ChevronsLeft className="size-4" />
             </Button>
@@ -242,7 +239,7 @@ export function MethodologyTable({
               className="size-8"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              aria-label="Previous page"
+              aria-label="الصفحة السابقة"
             >
               <ChevronLeft className="size-4" />
             </Button>
@@ -252,7 +249,7 @@ export function MethodologyTable({
               className="size-8"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              aria-label="Next page"
+              aria-label="الصفحة التالية"
             >
               <ChevronRight className="size-4" />
             </Button>
@@ -262,7 +259,7 @@ export function MethodologyTable({
               className="size-8"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
-              aria-label="Last page"
+              aria-label="الصفحة الأخيرة"
             >
               <ChevronsRight className="size-4" />
             </Button>

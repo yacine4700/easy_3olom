@@ -22,15 +22,14 @@ export async function GET(request: Request) {
     );
     if (errorResponse) return errorResponse;
 
-    const result = await listMethodologies(parsed);
-    return ok(result);
+    return ok(await listMethodologies(parsed));
   } catch (error) {
     console.error("[API] GET /api/methodology failed:", error);
     return serverError();
   }
 }
 
-/** POST /api/methodology — create a teaching sequence. */
+/** POST /api/methodology — create a teaching sequence (writes go through the webhook). */
 export async function POST(request: Request) {
   try {
     let body: unknown;
@@ -46,10 +45,10 @@ export async function POST(request: Request) {
     const [parsed, errorResponse] = validate(createMethodologySchema, body);
     if (errorResponse) return errorResponse;
 
-    const methodology = await createMethodology(parsed);
-    return created(methodology);
+    return created(await createMethodology(parsed));
   } catch (error) {
-    console.error("[API] POST /api/methodology failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -54,15 +54,15 @@ export function DocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Edit document" : "New document"}
+            {isEdit ? "تعديل الوثيقة" : "وثيقة جديدة"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the metadata for this knowledge document."
-              : "Add a new source document to the RAG knowledge base."}
+              ? "عدّل بيانات هذه الوثيقة في قاعدة المعرفة."
+              : "أضف وثيقة جديدة إلى قاعدة المعرفة لتغذية المساعد."}
           </DialogDescription>
         </DialogHeader>
 

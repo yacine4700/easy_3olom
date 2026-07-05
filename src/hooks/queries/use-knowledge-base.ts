@@ -35,8 +35,8 @@ export interface ListResult {
 function buildQueryString(query: ListKnowledgeDocumentsQuery) {
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
-  if (query.level) params.set("level", query.level);
-  if (query.status) params.set("status", query.status);
+  if (query.domain) params.set("domain", query.domain);
+  if (query.unit) params.set("unit", query.unit);
   params.set("page", String(query.page));
   params.set("pageSize", String(query.pageSize));
   return params.toString();
@@ -52,7 +52,7 @@ export function useKnowledgeDocuments(query: ListKnowledgeDocumentsQuery) {
   });
 }
 
-/** Create a document. */
+/** Create a document (writes through the webhook). */
 export function useCreateKnowledgeDocument() {
   const qc = useQueryClient();
   return useMutation({
@@ -63,13 +63,13 @@ export function useCreateKnowledgeDocument() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: knowledgeBaseKeys.lists() });
-      toast.success("Document created");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Update a document. */
+/** Update a document (writes through the webhook). */
 export function useUpdateKnowledgeDocument() {
   const qc = useQueryClient();
   return useMutation({
@@ -89,13 +89,13 @@ export function useUpdateKnowledgeDocument() {
       qc.invalidateQueries({
         queryKey: knowledgeBaseKeys.detail(data.id),
       });
-      toast.success("Document updated");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Delete a document. */
+/** Delete a document (writes through the webhook). */
 export function useDeleteKnowledgeDocument() {
   const qc = useQueryClient();
   return useMutation({
@@ -103,9 +103,8 @@ export function useDeleteKnowledgeDocument() {
       fetchJson<void>(`/api/knowledge-base/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: knowledgeBaseKeys.lists() });
-      toast.success("Document deleted");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
-

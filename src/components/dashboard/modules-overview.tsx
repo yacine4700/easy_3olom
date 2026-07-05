@@ -12,9 +12,9 @@ export function ModulesOverview() {
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-medium">Modules</h2>
+        <h2 className="text-sm font-medium">الوحدات</h2>
         <span className="text-muted-foreground text-xs">
-          {modules.length} planned
+          {modules.length} مخطط
         </span>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

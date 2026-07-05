@@ -54,7 +54,7 @@ export function SidebarNav() {
                         {item.badge ? (
                           <Badge
                             variant="secondary"
-                            className="ml-auto h-4 px-1.5 text-[10px] font-medium"
+                            className="ms-auto h-4 px-1.5 text-[10px] font-medium"
                           >
                             {item.badge}
                           </Badge>

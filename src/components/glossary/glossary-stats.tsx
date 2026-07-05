@@ -1,12 +1,11 @@
-import { BookText, CheckCircle2, Languages } from "lucide-react";
+import { BookText, Layers } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface Stats {
   total: number;
-  published: number;
-  bilingual: number;
+  domains: number;
 }
 
 /** Compact stat cards shown above the glossary table. */
@@ -14,29 +13,22 @@ export function GlossaryStats({ stats }: { stats: Stats }) {
   const items = [
     {
       key: "total",
-      label: "Total terms",
+      label: "إجمالي المصطلحات",
       value: stats.total,
       icon: BookText,
       tone: "default" as const,
     },
     {
-      key: "published",
-      label: "Published",
-      value: stats.published,
-      icon: CheckCircle2,
+      key: "domains",
+      label: "المجالات",
+      value: stats.domains,
+      icon: Layers,
       tone: "brand" as const,
-    },
-    {
-      key: "bilingual",
-      label: "Bilingual (FR + AR)",
-      value: stats.bilingual,
-      icon: Languages,
-      tone: "muted" as const,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -47,9 +39,7 @@ export function GlossaryStats({ stats }: { stats: Stats }) {
                   "flex size-9 items-center justify-center rounded-md",
                   item.tone === "brand"
                     ? "bg-brand/10 text-brand"
-                    : item.tone === "muted"
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-foreground/5 text-foreground",
+                    : "bg-foreground/5 text-foreground",
                 )}
               >
                 <Icon className="size-4.5" />

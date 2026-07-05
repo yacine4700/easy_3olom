@@ -18,7 +18,7 @@ import type { Methodology } from "@/types/domain";
 interface MethodologyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** When provided the dialog edits this sequence; otherwise it creates. */
+  /** When provided the dialog edits this rule; otherwise it creates. */
   methodology?: Methodology | null;
 }
 
@@ -52,12 +52,12 @@ export function MethodologyDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Edit sequence" : "New sequence"}
+            {isEdit ? "تعديل القاعدة" : "قاعدة جديدة"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update this bilingual teaching sequence."
-              : "Add a new bilingual teaching sequence (démarche)."}
+              ? "حدّث محتوى هذه القاعدة التوجيهية لمساعد الذكاء الاصطناعي."
+              : "أضف قاعدة توجيهية جديدة لمساعد الذكاء الاصطناعي."}
           </DialogDescription>
         </DialogHeader>
 

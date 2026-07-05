@@ -3,7 +3,6 @@
 import * as React from "react";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,8 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LevelBadge } from "@/components/shared/level-badge";
-import { StatusBadge } from "@/components/shared/status-badge";
 import type { GlossaryTerm } from "@/types/domain";
 
 export interface TermRowActions {
@@ -31,14 +28,14 @@ function RowActionsCell({
   actions: TermRowActions;
 }) {
   return (
-    <div className="text-right">
+    <div className="text-end">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             className="size-8 text-muted-foreground"
-            aria-label="Open row actions"
+            aria-label="إجراءات الصف"
           >
             <MoreHorizontal className="size-4" />
           </Button>
@@ -46,7 +43,7 @@ function RowActionsCell({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => actions.onEdit(term)}>
             <Pencil className="size-4" />
-            Edit
+            تعديل
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -54,12 +51,18 @@ function RowActionsCell({
             onClick={() => actions.onDelete(term)}
           >
             <Trash2 className="size-4" />
-            Delete
+            حذف
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
+}
+
+/** Truncate a definition for the column preview. */
+function preview(text: string | null, max = 80): string {
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
 }
 
 /** Build the column definitions for the glossary table. */
@@ -76,14 +79,14 @@ export function getTermColumns(
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label="تحديد الكل"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label="تحديد الصف"
         />
       ),
       enableSorting: false,
@@ -92,52 +95,34 @@ export function getTermColumns(
     },
     {
       accessorKey: "term",
-      header: "Term (FR)",
+      header: "المصطلح",
       cell: ({ row }) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.original.term}</span>
-          <span
-            dir="rtl"
-            className="text-muted-foreground truncate text-xs"
-            lang="ar"
-          >
-            {row.original.termAr}
-          </span>
+          {row.original.definition ? (
+            <span className="text-muted-foreground max-w-[44ch] truncate text-xs">
+              {preview(row.original.definition)}
+            </span>
+          ) : null}
         </div>
       ),
     },
     {
-      id: "definition",
-      header: "Definition",
+      accessorKey: "unit",
+      header: "الوحدة",
       cell: ({ row }) => (
-        <div className="max-w-[42ch]">
-          <p className="text-muted-foreground truncate text-xs">
-            {row.original.definition}
-          </p>
-        </div>
+        <span className="text-muted-foreground text-sm">
+          {row.original.unit || "—"}
+        </span>
       ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: "level",
-      header: "Level",
-      cell: ({ row }) => <LevelBadge level={row.original.level} />,
-      size: 90,
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
       size: 140,
     },
     {
-      accessorKey: "updatedAt",
-      header: "Updated",
+      accessorKey: "domain",
+      header: "المجال",
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-xs">
-          {formatDistanceToNow(new Date(row.original.updatedAt), {
-            addSuffix: true,
-          })}
+        <span className="text-muted-foreground text-sm">
+          {row.original.domain || "—"}
         </span>
       ),
       size: 120,

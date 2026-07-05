@@ -12,7 +12,7 @@ import { created, ok, validate, serverError } from "@/lib/api";
 
 /**
  * GET /api/knowledge-base
- * List documents with optional search/level/status filters + pagination.
+ * List documents with optional search/domain/unit filters + pagination.
  */
 export async function GET(request: Request) {
   try {
@@ -25,8 +25,7 @@ export async function GET(request: Request) {
     );
     if (errorResponse) return errorResponse;
 
-    const result = await listKnowledgeDocuments(parsed);
-    return ok(result);
+    return ok(await listKnowledgeDocuments(parsed));
   } catch (error) {
     console.error("[API] GET /api/knowledge-base failed:", error);
     return serverError();
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/knowledge-base
- * Create a new knowledge document.
+ * Create a new knowledge document (writes go through the webhook).
  */
 export async function POST(request: Request) {
   try {
@@ -52,10 +51,11 @@ export async function POST(request: Request) {
     const [parsed, errorResponse] = validate(createKnowledgeDocumentSchema, body);
     if (errorResponse) return errorResponse;
 
-    const document = await createKnowledgeDocument(parsed);
-    return created(document);
+    return created(await createKnowledgeDocument(parsed));
   } catch (error) {
-    console.error("[API] POST /api/knowledge-base failed:", error);
-    return serverError();
+    // The service throws Error with an Arabic message when the webhook fails.
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

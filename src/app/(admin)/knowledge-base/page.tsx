@@ -10,18 +10,15 @@ import {
 } from "@/lib/services/knowledge-base";
 
 export const metadata: Metadata = {
-  title: "Knowledge Base",
+  title: "قاعدة المعرفة",
 };
 
 /**
- * /knowledge-base — Knowledge Base module (Phase 2).
+ * /knowledge-base — Knowledge Base module.
  *
  * Server Component: fetches the first page + aggregate stats directly from
  * the service layer (no client round-trip on first paint), then hands off to
  * the client `KnowledgeBaseView` which keeps data fresh via TanStack Query.
- *
- * This Server-Component-first pattern gives instant first paint while still
- * allowing optimistic, interactive CRUD on the client.
  */
 export default async function KnowledgeBasePage() {
   // Run both reads in parallel to keep the server response fast.
@@ -38,15 +35,15 @@ export default async function KnowledgeBasePage() {
             <Library className="size-4" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Knowledge Base
+            قاعدة المعرفة
           </h1>
           <Badge variant="secondary" className="font-medium">
             RAG
           </Badge>
         </div>
         <p className="text-muted-foreground text-sm">
-          Manage source documents and embeddings powering the assistant&apos;s
-          retrieval.
+          إدارة الوثائق المصدرية التي تُغذّي مساعد RAG في مادة علوم الطبيعة
+          والحياة.
         </p>
       </div>
 

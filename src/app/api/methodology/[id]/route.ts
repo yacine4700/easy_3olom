@@ -37,7 +37,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/methodology/[id] */
+/** PATCH /api/methodology/[id] (writes go through the webhook). */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -63,12 +63,13 @@ export async function PATCH(
     if (!methodology) return notFound("Methodology not found");
     return ok(methodology);
   } catch (error) {
-    console.error("[API] PATCH /api/methodology/[id] failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
 
-/** DELETE /api/methodology/[id] */
+/** DELETE /api/methodology/[id] (writes go through the webhook). */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -77,11 +78,11 @@ export async function DELETE(
     const { id } = await params;
     if (!isValidId(id)) return badRequest("Invalid id");
 
-    const deleted = await deleteMethodology(id);
-    if (!deleted) return notFound("Methodology not found");
+    await deleteMethodology(id);
     return noContent();
   } catch (error) {
-    console.error("[API] DELETE /api/methodology/[id] failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

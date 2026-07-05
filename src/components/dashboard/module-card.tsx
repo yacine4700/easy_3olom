@@ -46,7 +46,7 @@ export function ModuleCard({
           </Badge>
         ) : (
           <Badge className="bg-brand/10 text-brand font-medium hover:bg-brand/10">
-            Active
+            مفعّل
           </Badge>
         )}
       </div>
@@ -58,7 +58,7 @@ export function ModuleCard({
       </div>
       {!disabled && (
         <div className="text-muted-foreground mt-auto flex items-center gap-1 text-xs">
-          Open
+          فتح
           <ArrowUpRight className="size-3.5" />
         </div>
       )}

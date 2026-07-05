@@ -25,7 +25,7 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
  */
 export function AppSidebar() {
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar side="right" collapsible="icon" className="border-s">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -39,7 +39,7 @@ export function AppSidebar() {
                 <div className="bg-brand text-brand-foreground flex aspect-square size-8 items-center justify-center rounded-md">
                   <Leaf className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <div className="grid flex-1 text-start text-sm leading-tight">
                   <span className="truncate font-semibold">
                     {siteConfig.name}
                   </span>
@@ -62,7 +62,7 @@ export function AppSidebar() {
           <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <span className="inline-flex size-1.5 shrink-0 rounded-full bg-emerald-500" />
             <span className="truncate group-data-[collapsible=icon]:hidden">
-              n8n · Supabase connected
+              n8n · Supabase متصل
             </span>
           </div>
         </SidebarGroup>

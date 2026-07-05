@@ -1,150 +1,73 @@
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import { notifyWebhook } from "@/lib/webhook";
 import type { KnowledgeDocument } from "@/types/domain";
-import type {
-  CreateKnowledgeDocumentInput,
-  ListKnowledgeDocumentsQuery,
-  UpdateKnowledgeDocumentInput,
-} from "@/lib/validators/knowledge-base";
+import type { CreateKnowledgeDocumentInput, ListKnowledgeDocumentsQuery, UpdateKnowledgeDocumentInput } from "@/lib/validators/knowledge-base";
 
-/**
- * Knowledge Base service (repository pattern).
- *
- * This is the only place that touches Prisma for this module. Every UI/API
- * consumer goes through these functions, so the persistence layer can be
- * swapped (e.g. to Supabase) by re-implementing this file alone — the
- * signatures, validators and types stay unchanged.
- */
+const TABLE = "knowledge_base";
 
-type KnowledgeDocumentRow = {
-  id: string;
-  title: string;
-  source: string;
-  level: string;
-  status: string;
-  chunkCount: number;
-  embeddingReady: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+type Row = {
+  id: number | string; title: string | null; content: string | null;
+  domain: string | null; unit: string | null; keywords: string[] | null;
+  bot_instructions: string | null; created_at?: string | null;
 };
 
-/** Map a Prisma row to the typed domain object (Date -> ISO string). */
-function toDomain(row: KnowledgeDocumentRow): KnowledgeDocument {
-  return {
-    id: row.id,
-    title: row.title,
-    source: row.source,
-    level: row.level as KnowledgeDocument["level"],
-    status: row.status as KnowledgeDocument["status"],
-    chunkCount: row.chunkCount,
-    embeddingReady: row.embeddingReady,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+function toDomain(r: Row): KnowledgeDocument {
+  return { id: String(r.id), title: r.title ?? "", content: r.content, domain: r.domain, unit: r.unit,
+    keywords: Array.isArray(r.keywords) ? r.keywords : null, botInstructions: r.bot_instructions, createdAt: r.created_at ?? undefined };
 }
 
-export interface ListResult {
-  items: KnowledgeDocument[];
-  total: number;
-  page: number;
-  pageSize: number;
+export interface ListResult { items: KnowledgeDocument[]; total: number; page: number; pageSize: number; }
+
+export async function listKnowledgeDocuments(query: ListKnowledgeDocumentsQuery): Promise<ListResult> {
+  const { search, domain, unit, page, pageSize } = query;
+  let req = supabase.from(TABLE).select("*", { count: "exact" });
+  if (domain) req = req.eq("domain", domain);
+  if (unit) req = req.eq("unit", unit);
+  if (search) req = req.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+  req = req.order("created_at", { ascending: false, nullsFirst: false }).range((page - 1) * pageSize, page * pageSize - 1);
+  const { data, error, count } = await req;
+  if (error) throw error;
+  return { items: (data as Row[]).map(toDomain), total: count ?? 0, page, pageSize };
 }
 
-export async function listKnowledgeDocuments(
-  query: ListKnowledgeDocumentsQuery,
-): Promise<ListResult> {
-  const { search, level, status, page, pageSize } = query;
+export async function getKnowledgeDocument(id: string): Promise<KnowledgeDocument | null> {
+  const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).single();
+  if (error || !data) return null;
+  return toDomain(data as Row);
+}
 
-  const where = {
-    ...(level ? { level } : {}),
-    ...(status ? { status } : {}),
-    ...(search
-      ? {
-          OR: [
-            { title: { contains: search } },
-            { source: { contains: search } },
-          ],
-        }
-      : {}),
-  };
-
-  const [rows, total] = await Promise.all([
-    db.knowledgeDocument.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    db.knowledgeDocument.count({ where }),
+export async function getKnowledgeBaseStats() {
+  const [totalRes, allRes] = await Promise.all([
+    supabase.from(TABLE).select("*", { count: "exact", head: true }),
+    supabase.from(TABLE).select("domain"),
   ]);
-
-  return {
-    items: rows.map(toDomain),
-    total,
-    page,
-    pageSize,
-  };
+  const domains = new Set((allRes.data ?? []).map((r: { domain: string | null }) => r.domain).filter(Boolean));
+  return { total: totalRes.count ?? 0, domains: domains.size };
 }
 
-export async function getKnowledgeDocument(
-  id: string,
-): Promise<KnowledgeDocument | null> {
-  const row = await db.knowledgeDocument.findUnique({ where: { id } });
-  return row ? toDomain(row) : null;
-}
-
-export async function createKnowledgeDocument(
-  input: CreateKnowledgeDocumentInput,
-): Promise<KnowledgeDocument> {
-  const row = await db.knowledgeDocument.create({
-    data: {
-      title: input.title,
-      source: input.source,
-      level: input.level,
-      status: input.status,
-      chunkCount: input.chunkCount,
-      embeddingReady: input.embeddingReady,
-    },
+// WRITES → webhook only
+export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInput): Promise<KnowledgeDocument> {
+  const result = await notifyWebhook("knowledge", "create", {
+    domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
+    content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
   });
-  return toDomain(row);
+  if (!result.success) throw new Error(result.error);
+  return { id: "", title: input.title, content: input.content ?? null, domain: input.domain ?? null,
+    unit: input.unit ?? null, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null, createdAt: new Date().toISOString() };
 }
 
-export async function updateKnowledgeDocument(
-  id: string,
-  input: UpdateKnowledgeDocumentInput,
-): Promise<KnowledgeDocument | null> {
-  try {
-    const row = await db.knowledgeDocument.update({
-      where: { id },
-      data: input,
-    });
-    return toDomain(row);
-  } catch {
-    // Prisma throws P2025 when the record doesn't exist.
-    return null;
-  }
+export async function updateKnowledgeDocument(id: string, input: UpdateKnowledgeDocumentInput): Promise<KnowledgeDocument | null> {
+  const result = await notifyWebhook("knowledge", "update", {
+    id, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
+    content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
+  });
+  if (!result.success) throw new Error(result.error);
+  return { id, title: input.title ?? "", content: input.content ?? null, domain: input.domain ?? null,
+    unit: input.unit ?? null, keywords: input.keywords ?? null, botInstructions: input.botInstructions ?? null };
 }
 
-export async function deleteKnowledgeDocument(
-  id: string,
-): Promise<boolean> {
-  try {
-    await db.knowledgeDocument.delete({ where: { id } });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Lightweight aggregate counts for dashboard/header surfaces. */
-export async function getKnowledgeBaseStats(): Promise<{
-  total: number;
-  published: number;
-  embeddingReady: number;
-}> {
-  const [total, published, embeddingReady] = await Promise.all([
-    db.knowledgeDocument.count(),
-    db.knowledgeDocument.count({ where: { status: "published" } }),
-    db.knowledgeDocument.count({ where: { embeddingReady: true } }),
-  ]);
-  return { total, published, embeddingReady };
+export async function deleteKnowledgeDocument(id: string): Promise<boolean> {
+  const result = await notifyWebhook("knowledge", "delete", id);
+  if (!result.success) throw new Error(result.error);
+  return true;
 }

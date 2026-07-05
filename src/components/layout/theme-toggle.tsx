@@ -31,7 +31,7 @@ export function ThemeToggle() {
           variant="ghost"
           size="icon"
           className="text-muted-foreground"
-          aria-label="Toggle theme"
+          aria-label="تبديل المظهر"
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           {!mounted ? (
@@ -44,7 +44,7 @@ export function ThemeToggle() {
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {mounted ? (isDark ? "Switch to light" : "Switch to dark") : "Toggle theme"}
+        {mounted ? (isDark ? "الوضع الفاتح" : "الوضع الداكن") : "تبديل المظهر"}
       </TooltipContent>
     </Tooltip>
   );

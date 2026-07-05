@@ -8,19 +8,11 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createKnowledgeDocumentSchema,
   type CreateKnowledgeDocumentInput,
 } from "@/lib/validators/knowledge-base";
-import { CONTENT_STATUSES, EDUCATION_LEVELS } from "@/lib/constants/education";
 import type { KnowledgeDocument } from "@/types/domain";
 
 interface DocumentFormProps {
@@ -34,17 +26,40 @@ interface DocumentFormProps {
 /** Empty defaults shared by create mode and as a fallback. */
 const EMPTY: CreateKnowledgeDocumentInput = {
   title: "",
-  source: "",
-  level: "1AS",
-  status: "draft",
-  chunkCount: 0,
-  embeddingReady: false,
+  content: null,
+  domain: null,
+  unit: null,
+  keywords: null,
+  botInstructions: null,
 };
 
 /**
+ * Convert an array of keyword strings into a single comma-separated display
+ * string (Arabic comma joins reads naturally in RTL).
+ */
+function keywordsToText(keywords: string[] | null | undefined): string {
+  if (!keywords || keywords.length === 0) return "";
+  return keywords.join("، ");
+}
+
+/**
+ * Parse a free-text input into a keywords array, splitting on both Latin and
+ * Arabic commas and trimming empties.
+ */
+function textToKeywords(text: string): string[] {
+  return text
+    .split(/[,،]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
  * Create/edit form for a knowledge document.
+ *
  * Uses react-hook-form + zod; the same schema validates on both client and
- * server. Controlled selects/switch are bridged into RHF manually.
+ * server. The `keywords` field is stored as `string[]` on the domain, but
+ * presented to the user as a single comma-separated text input — we bridge
+ * the two with a local React state and `setValue`.
  */
 export function DocumentForm({
   defaultValues,
@@ -57,11 +72,11 @@ export function DocumentForm({
     ...(defaultValues
       ? {
           title: defaultValues.title ?? "",
-          source: defaultValues.source ?? "",
-          level: (defaultValues.level as CreateKnowledgeDocumentInput["level"]) ?? "1AS",
-          status: (defaultValues.status as CreateKnowledgeDocumentInput["status"]) ?? "draft",
-          chunkCount: defaultValues.chunkCount ?? 0,
-          embeddingReady: defaultValues.embeddingReady ?? false,
+          content: defaultValues.content ?? null,
+          domain: defaultValues.domain ?? null,
+          unit: defaultValues.unit ?? null,
+          keywords: defaultValues.keywords ?? null,
+          botInstructions: defaultValues.botInstructions ?? null,
         }
       : {}),
   };
@@ -70,16 +85,28 @@ export function DocumentForm({
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<CreateKnowledgeDocumentInput>({
     resolver: zodResolver(createKnowledgeDocumentSchema),
     defaultValues: values,
   });
 
-  const level = watch("level");
-  const status = watch("status");
-  const embeddingReady = watch("embeddingReady");
+  // Local text state mirrors the array field for display + editing.
+  const [keywordsText, setKeywordsText] = React.useState(
+    keywordsToText(defaultValues?.keywords),
+  );
+
+  function handleKeywordsChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const text = event.target.value;
+    setKeywordsText(text);
+    const arr = textToKeywords(text);
+    setValue("keywords", arr.length ? arr : null, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  }
 
   return (
     <form
@@ -88,10 +115,10 @@ export function DocumentForm({
       className="space-y-4"
     >
       <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
+        <Label htmlFor="title">العنوان</Label>
         <Input
           id="title"
-          placeholder="e.g. La cellule — unité du vivant"
+          placeholder="مثال: الخلية — وحدة الكائن الحي"
           autoComplete="off"
           {...register("title")}
         />
@@ -101,116 +128,88 @@ export function DocumentForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="source">Source</Label>
-        <Input
-          id="source"
-          placeholder="e.g. Manuel 1AS — SVT"
-          autoComplete="off"
-          {...register("source")}
+        <Label htmlFor="content">المحتوى</Label>
+        <Textarea
+          id="content"
+          placeholder="اكتب محتوى الوثيقة هنا…"
+          rows={6}
+          {...register("content")}
         />
-        {errors.source && (
-          <p className="text-destructive text-xs">{errors.source.message}</p>
+        {errors.content && (
+          <p className="text-destructive text-xs">
+            {errors.content.message as string}
+          </p>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="level">Education level</Label>
-          <Select
-            value={level}
-            onValueChange={(v) =>
-              setValue("level", v as CreateKnowledgeDocumentInput["level"], {
-                shouldValidate: true,
-              })
-            }
-          >
-            <SelectTrigger id="level" className="w-full">
-              <SelectValue placeholder="Select level" />
-            </SelectTrigger>
-            <SelectContent>
-              {EDUCATION_LEVELS.map((l) => (
-                <SelectItem key={l.value} value={l.value}>
-                  <span className="font-medium">{l.label}</span>
-                  <span className="text-muted-foreground"> · {l.hint}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.level && (
-            <p className="text-destructive text-xs">{errors.level.message}</p>
+          <Label htmlFor="domain">المجال</Label>
+          <Input
+            id="domain"
+            placeholder="مثال: علم الخلية"
+            autoComplete="off"
+            {...register("domain")}
+          />
+          {errors.domain && (
+            <p className="text-destructive text-xs">
+              {errors.domain.message as string}
+            </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
-          <Select
-            value={status}
-            onValueChange={(v) =>
-              setValue("status", v as CreateKnowledgeDocumentInput["status"], {
-                shouldValidate: true,
-              })
-            }
-          >
-            <SelectTrigger id="status" className="w-full">
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              {CONTENT_STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.status && (
-            <p className="text-destructive text-xs">{errors.status.message}</p>
+          <Label htmlFor="unit">الوحدة</Label>
+          <Input
+            id="unit"
+            placeholder="مثال: الوحدة الأولى"
+            autoComplete="off"
+            {...register("unit")}
+          />
+          {errors.unit && (
+            <p className="text-destructive text-xs">
+              {errors.unit.message as string}
+            </p>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="chunkCount">Chunk count</Label>
-          <Input
-            id="chunkCount"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            {...register("chunkCount", { valueAsNumber: true })}
-          />
-          {errors.chunkCount && (
-            <p className="text-destructive text-xs">
-              {errors.chunkCount.message}
-            </p>
-          )}
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="keywords">الكلمات المفتاحية</Label>
+        <Input
+          id="keywords"
+          value={keywordsText}
+          onChange={handleKeywordsChange}
+          placeholder="افصل بين الكلمات بفاصلة ، مثال: خلية، غشاء، نواة"
+          autoComplete="off"
+        />
+        <p className="text-muted-foreground text-xs">
+          افصل بين كل كلمة وأخرى بفاصلة (، أو ,).
+        </p>
+      </div>
 
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="embeddingReady" className="text-sm">
-              Embedding ready
-            </Label>
-            <p className="text-muted-foreground text-xs">
-              Vectorized & ready for RAG retrieval
-            </p>
-          </div>
-          <Switch
-            id="embeddingReady"
-            checked={embeddingReady}
-            onCheckedChange={(checked) =>
-              setValue("embeddingReady", checked, { shouldValidate: true })
-            }
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="botInstructions">تعليمات البوت</Label>
+        <Textarea
+          id="botInstructions"
+          placeholder="تعليمات توجيهية تُمرَّر إلى المساعد عند استعمال هذه الوثيقة…"
+          rows={4}
+          {...register("botInstructions")}
+        />
+        {errors.botInstructions && (
+          <p className="text-destructive text-xs">
+            {errors.botInstructions.message as string}
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          إلغاء
         </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="size-4 animate-spin" />}
-          {defaultValues ? "Save changes" : "Create document"}
+          {defaultValues ? "حفظ التغييرات" : "إنشاء وثيقة"}
         </Button>
       </div>
     </form>

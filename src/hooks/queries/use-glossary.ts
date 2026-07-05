@@ -35,14 +35,14 @@ export interface GlossaryListResult {
 function buildQueryString(query: ListGlossaryTermsQuery) {
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
-  if (query.level) params.set("level", query.level);
-  if (query.status) params.set("status", query.status);
+  if (query.domain) params.set("domain", query.domain);
+  if (query.unit) params.set("unit", query.unit);
   params.set("page", String(query.page));
   params.set("pageSize", String(query.pageSize));
   return params.toString();
 }
 
-/** Read a list of glossary terms with filters (search covers FR + AR). */
+/** Read a list of glossary terms with filters. */
 export function useGlossaryTerms(query: ListGlossaryTermsQuery) {
   return useQuery({
     queryKey: glossaryKeys.list(query),
@@ -52,7 +52,7 @@ export function useGlossaryTerms(query: ListGlossaryTermsQuery) {
   });
 }
 
-/** Create a glossary term. */
+/** Create a glossary term (writes through the webhook). */
 export function useCreateGlossaryTerm() {
   const qc = useQueryClient();
   return useMutation({
@@ -63,13 +63,13 @@ export function useCreateGlossaryTerm() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: glossaryKeys.lists() });
-      toast.success("Term created");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Update a glossary term. */
+/** Update a glossary term (writes through the webhook). */
 export function useUpdateGlossaryTerm() {
   const qc = useQueryClient();
   return useMutation({
@@ -87,13 +87,13 @@ export function useUpdateGlossaryTerm() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: glossaryKeys.lists() });
       qc.invalidateQueries({ queryKey: glossaryKeys.detail(data.id) });
-      toast.success("Term updated");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Delete a glossary term. */
+/** Delete a glossary term (writes through the webhook). */
 export function useDeleteGlossaryTerm() {
   const qc = useQueryClient();
   return useMutation({
@@ -101,7 +101,7 @@ export function useDeleteGlossaryTerm() {
       fetchJson<void>(`/api/glossary/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: glossaryKeys.lists() });
-      toast.success("Term deleted");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });

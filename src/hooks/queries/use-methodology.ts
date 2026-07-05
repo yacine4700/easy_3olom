@@ -35,14 +35,12 @@ export interface MethodologyListResult {
 function buildQueryString(query: ListMethodologiesQuery) {
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
-  if (query.level) params.set("level", query.level);
-  if (query.status) params.set("status", query.status);
   params.set("page", String(query.page));
   params.set("pageSize", String(query.pageSize));
   return params.toString();
 }
 
-/** Read a list of teaching sequences with filters (search covers FR + AR). */
+/** Read a list of teaching sequences with filters. */
 export function useMethodologies(query: ListMethodologiesQuery) {
   return useQuery({
     queryKey: methodologyKeys.list(query),
@@ -54,7 +52,7 @@ export function useMethodologies(query: ListMethodologiesQuery) {
   });
 }
 
-/** Create a teaching sequence. */
+/** Create a teaching sequence (writes through the webhook). */
 export function useCreateMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -65,13 +63,13 @@ export function useCreateMethodology() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
-      toast.success("Sequence created");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Update a teaching sequence. */
+/** Update a teaching sequence (writes through the webhook). */
 export function useUpdateMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -89,13 +87,13 @@ export function useUpdateMethodology() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
       qc.invalidateQueries({ queryKey: methodologyKeys.detail(data.id) });
-      toast.success("Sequence updated");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Delete a teaching sequence. */
+/** Delete a teaching sequence (writes through the webhook). */
 export function useDeleteMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -103,7 +101,7 @@ export function useDeleteMethodology() {
       fetchJson<void>(`/api/methodology/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
-      toast.success("Sequence deleted");
+      toast.success("تم الإرسال إلى Webhook");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });

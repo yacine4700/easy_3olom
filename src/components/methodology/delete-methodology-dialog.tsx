@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
 import {
@@ -42,18 +41,17 @@ export function DeleteMethodologyDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete sequence?</AlertDialogTitle>
+          <AlertDialogTitle>حذف القاعدة؟</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete{" "}
+            سيتم حذف القاعدة{" "}
             <span className="text-foreground font-medium">
               {methodology?.title}
-            </span>
-            <span className="text-muted-foreground"> / {methodology?.titleAr}</span>{" "}
-            from the methodology. This action cannot be undone.
+            </span>{" "}
+            بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={deleteMutation.isPending}
@@ -66,7 +64,7 @@ export function DeleteMethodologyDialog({
               <Loader2 className="size-4 animate-spin" />
             )}
             <Trash2 className="size-4" />
-            Delete
+            حذف
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

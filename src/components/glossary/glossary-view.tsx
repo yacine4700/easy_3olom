@@ -24,11 +24,9 @@ export function GlossaryView({
 }) {
   const [filters, setFilters] = React.useState<TermsTableFilters>({
     search: "",
-    level: "all",
-    status: "all",
   });
 
-  // Debounce search across both languages.
+  // Debounce search so we don't fire a request on every keystroke.
   const [debouncedSearch, setDebouncedSearch] = React.useState(filters.search);
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -38,12 +36,10 @@ export function GlossaryView({
   const query = React.useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      level: filters.level === "all" ? undefined : filters.level,
-      status: filters.status === "all" ? undefined : filters.status,
       page: 1,
       pageSize: 50,
     }),
-    [debouncedSearch, filters.level, filters.status],
+    [debouncedSearch],
   );
 
   const { data, isLoading, isFetching } = useGlossaryTerms(query);

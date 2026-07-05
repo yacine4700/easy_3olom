@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import { BookText } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { GlossaryStats } from "@/components/glossary/glossary-stats";
 import { GlossaryView } from "@/components/glossary/glossary-view";
 import { getGlossaryStats, listGlossaryTerms } from "@/lib/services/glossary";
 
 export const metadata: Metadata = {
-  title: "Glossary",
+  title: "المعجم",
 };
 
 /**
- * /glossary — Glossary module (Phase 3).
+ * /glossary — Glossary module.
  *
  * Server Component: fetches the first page + stats directly from the service
  * layer (instant first paint), then hands off to the client `GlossaryView`.
- * Bilingual (FR + AR) terms feed the RAG assistant that answers in Arabic.
+ * The glossary feeds the RAG assistant's scientific vocabulary.
  */
 export default async function GlossaryPage() {
   const [initial, stats] = await Promise.all([
@@ -30,14 +29,10 @@ export default async function GlossaryPage() {
           <div className="bg-brand/10 text-brand flex size-7 items-center justify-center rounded-md">
             <BookText className="size-4" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Glossary</h1>
-          <Badge variant="secondary" className="font-medium">
-            FR · AR
-          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight">المعجم</h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Bilingual terminology powering the assistant&apos;s scientific
-          vocabulary (علوم الطبيعة والحياة).
+          مصطلحات وتعريفات علمية تُغذّي مساعد مادة علوم الطبيعة والحياة.
         </p>
       </div>
 

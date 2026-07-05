@@ -1,97 +1,44 @@
-/**
- * Domain types for Easy 3olom Admin.
- *
- * These are intentionally lightweight placeholders for Phase 1.
- * Each module (Knowledge Base, Glossary, ...) will expand its own
- * types as we build it. Centralising them here keeps the data
- * contracts stable across services and UI.
- */
+/** Domain types matching existing Supabase tables. */
 
-/** Generic status used across content modules */
+export type EducationLevel = "1AS" | "2AS" | "3AS" | "AS";
 export type ContentStatus = "draft" | "review" | "published" | "archived";
 
-/** Algerian secondary-education levels (سنوات التعليم الثانوي) */
-export type EducationLevel =
-  | "AS" // السنة الأولى علوم تجريبية
-  | "1AS"
-  | "2AS"
-  | "3AS";
-
-/** Shared metadata attached to most knowledge records */
 export interface BaseEntity {
   id: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* Module: Knowledge Base                                              */
-/* ------------------------------------------------------------------ */
+// knowledge_base table: id, domain, unit, title, keywords(jsonb), content, bot_instructions, created_at
 export interface KnowledgeDocument extends BaseEntity {
   title: string;
-  source: string;
-  level: EducationLevel;
-  status: ContentStatus;
-  chunkCount: number;
-  /** Supabase Storage / vector reference, filled in data layer phase */
-  embeddingReady: boolean;
+  content: string | null;
+  domain: string | null;
+  unit: string | null;
+  keywords: string[] | null;
+  botInstructions: string | null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Module: Methodology                                                 */
-/* ------------------------------------------------------------------ */
-/**
- * A teaching sequence/unit (démarche) for a given level. Bilingual to match
- * the curriculum. `order` sequences units within a level so the assistant
- * can reason about progression. Parent of Learning Objective.
- */
+// methodology_rules table: id, title, explanation, keywords(jsonb)
 export interface Methodology extends BaseEntity {
   title: string;
-  titleAr: string;
-  description: string;
-  descriptionAr: string;
-  level: EducationLevel;
-  order: number;
-  status: ContentStatus;
+  explanation: string | null;
+  keywords: string[] | null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Module: Learning Objectives                                         */
-/* ------------------------------------------------------------------ */
-export interface LearningObjective extends BaseEntity {
-  code: string;
-  description: string;
-  level: EducationLevel;
-  methodologyId: string | null;
-}
-
-/* ------------------------------------------------------------------ */
-/* Module: Glossary                                                    */
-/* ------------------------------------------------------------------ */
-/**
- * Bilingual glossary term. Algerian secondary science is taught bilingually
- * (French textbooks + Arabic instruction), so both languages are first-class
- * to feed the RAG assistant that answers students in Arabic.
- */
+// glossary table: id, term, definition, unit, domain
 export interface GlossaryTerm extends BaseEntity {
   term: string;
-  termAr: string;
-  definition: string;
-  definitionAr: string;
-  level: EducationLevel;
-  status: ContentStatus;
+  definition: string | null;
+  unit: string | null;
+  domain: string | null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Module: Student Questions                                           */
-/* ------------------------------------------------------------------ */
-export type QuestionStatus = "new" | "answered" | "flagged";
+// user_questions table: id, session_id, user_id, question, answer, created_at
+export type QuestionStatus = "new" | "answered";
 
 export interface StudentQuestion extends BaseEntity {
   question: string;
   answer: string | null;
-  status: QuestionStatus;
-  telegramChatId: string;
-  /** Whether the answer was grounded in retrieved context */
-  grounded: boolean;
+  sessionId: string | null;
+  userId: string | null;
 }

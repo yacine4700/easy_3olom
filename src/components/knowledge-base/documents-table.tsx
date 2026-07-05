@@ -46,8 +46,6 @@ interface DocumentsTableProps {
   documents: KnowledgeDocument[];
   isLoading?: boolean;
   actions: RowActions;
-  /** Optional external search string (controlled by the toolbar). */
-  globalFilter?: string;
 }
 
 /**
@@ -55,7 +53,7 @@ interface DocumentsTableProps {
  *
  * Built on TanStack Table with the shadcn table primitives. Sorting + client
  * pagination are handled locally; server-side filtering lives in the query
- * (the toolbar controls `search`/`level`/`status` which feed the API).
+ * (the toolbar controls `search` which feeds the API).
  */
 export function DocumentsTable({
   documents,
@@ -63,7 +61,7 @@ export function DocumentsTable({
   actions,
 }: DocumentsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "updatedAt", desc: true },
+    { id: "createdAt", desc: true },
   ]);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -88,6 +86,7 @@ export function DocumentsTable({
   const rows = table.getRowModel().rows;
   const showSkeletons = isLoading;
   const showEmpty = !isLoading && rows.length === 0;
+  const selectedCount = Object.values(rowSelection).filter(Boolean).length;
 
   return (
     <div className="space-y-3">
@@ -165,10 +164,10 @@ export function DocumentsTable({
                   <div className="flex flex-col items-center justify-center gap-2 text-center">
                     <Inbox className="text-muted-foreground/50 size-7" />
                     <p className="text-muted-foreground text-sm">
-                      No documents found
+                      لا توجد وثائق
                     </p>
                     <p className="text-muted-foreground/70 text-xs">
-                      Try adjusting your filters or add a new document.
+                      حاول تعديل المرشحات أو أضف وثيقة جديدة.
                     </p>
                   </div>
                 </TableCell>
@@ -184,7 +183,7 @@ export function DocumentsTable({
           <span>
             {showEmpty
               ? "0"
-              : `${rowSelectionSize(rowSelection)} of ${documents.length} selected`}
+              : `${selectedCount} من ${documents.length} محدد`}
           </span>
           {table.getFilteredSelectedRowModel().rows.length > 0 && (
             <Button
@@ -193,14 +192,14 @@ export function DocumentsTable({
               className="h-7 text-xs"
               onClick={() => setRowSelection({})}
             >
-              Clear
+              مسح
             </Button>
           )}
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-muted-foreground">Rows</span>
+            <span className="text-muted-foreground">الصفوف</span>
             <Select
               value={String(table.getState().pagination.pageSize)}
               onValueChange={(v) => table.setPageSize(Number(v))}
@@ -219,7 +218,7 @@ export function DocumentsTable({
           </div>
 
           <div className="text-muted-foreground text-xs">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            صفحة {table.getState().pagination.pageIndex + 1} من{" "}
             {table.getPageCount() || 1}
           </div>
 
@@ -230,7 +229,7 @@ export function DocumentsTable({
               className="size-8"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
-              aria-label="First page"
+              aria-label="الصفحة الأولى"
             >
               <ChevronsLeft className="size-4" />
             </Button>
@@ -240,7 +239,7 @@ export function DocumentsTable({
               className="size-8"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              aria-label="Previous page"
+              aria-label="الصفحة السابقة"
             >
               <ChevronLeft className="size-4" />
             </Button>
@@ -250,7 +249,7 @@ export function DocumentsTable({
               className="size-8"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              aria-label="Next page"
+              aria-label="الصفحة التالية"
             >
               <ChevronRight className="size-4" />
             </Button>
@@ -260,7 +259,7 @@ export function DocumentsTable({
               className="size-8"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
-              aria-label="Last page"
+              aria-label="الصفحة الأخيرة"
             >
               <ChevronsRight className="size-4" />
             </Button>
@@ -269,9 +268,4 @@ export function DocumentsTable({
       </div>
     </div>
   );
-}
-
-/** Helper: count selected rows from the record form. */
-function rowSelectionSize(rowSelection: Record<string, boolean>) {
-  return Object.values(rowSelection).filter(Boolean).length;
 }

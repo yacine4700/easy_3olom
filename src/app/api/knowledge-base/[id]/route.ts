@@ -6,16 +6,21 @@ import {
   updateKnowledgeDocument,
 } from "@/lib/services/knowledge-base";
 import { updateKnowledgeDocumentSchema } from "@/lib/validators/knowledge-base";
-import { badRequest, ok, notFound, serverError, validate, noContent } from "@/lib/api";
+import {
+  badRequest,
+  ok,
+  notFound,
+  serverError,
+  validate,
+  noContent,
+} from "@/lib/api";
 
-/** Helper: validate the id segment shape (cuid). */
+/** Validate the id segment shape (Supabase UUID or numeric string, 1-63 chars). */
 function isValidId(id: string) {
   return typeof id === "string" && id.length > 0 && id.length < 64;
 }
 
-/**
- * GET /api/knowledge-base/[id]
- */
+/** GET /api/knowledge-base/[id] */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -33,9 +38,7 @@ export async function GET(
   }
 }
 
-/**
- * PATCH /api/knowledge-base/[id]
- */
+/** PATCH /api/knowledge-base/[id] (writes go through the webhook). */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -61,14 +64,14 @@ export async function PATCH(
     if (!document) return notFound("Document not found");
     return ok(document);
   } catch (error) {
-    console.error("[API] PATCH /api/knowledge-base/[id] failed:", error);
-    return serverError();
+    // Webhook failure surfaces as Error with an Arabic message.
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
 
-/**
- * DELETE /api/knowledge-base/[id]
- */
+/** DELETE /api/knowledge-base/[id] (writes go through the webhook). */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -77,11 +80,11 @@ export async function DELETE(
     const { id } = await params;
     if (!isValidId(id)) return badRequest("Invalid id");
 
-    const deleted = await deleteKnowledgeDocument(id);
-    if (!deleted) return notFound("Document not found");
+    await deleteKnowledgeDocument(id);
     return noContent();
   } catch (error) {
-    console.error("[API] DELETE /api/knowledge-base/[id] failed:", error);
-    return serverError();
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

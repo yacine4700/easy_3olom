@@ -14,7 +14,7 @@ import type { Methodology } from "@/types/domain";
 
 /**
  * Client orchestrator for the Methodology list view.
- * Mirrors KB/Glossary views so the module pattern stays uniform.
+ * Search-only filters; debounced text search drives the server query.
  */
 export function MethodologyView({
   initialItems,
@@ -23,11 +23,9 @@ export function MethodologyView({
 }) {
   const [filters, setFilters] = React.useState<MethodologyTableFilters>({
     search: "",
-    level: "all",
-    status: "all",
   });
 
-  // Debounce search across both languages.
+  // Debounce search across title + explanation.
   const [debouncedSearch, setDebouncedSearch] = React.useState(filters.search);
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -37,12 +35,10 @@ export function MethodologyView({
   const query = React.useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      level: filters.level === "all" ? undefined : filters.level,
-      status: filters.status === "all" ? undefined : filters.status,
       page: 1,
       pageSize: 50,
     }),
-    [debouncedSearch, filters.level, filters.status],
+    [debouncedSearch],
   );
 
   const { data, isLoading, isFetching } = useMethodologies(query);

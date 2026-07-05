@@ -26,8 +26,6 @@ export function KnowledgeBaseView({
 }) {
   const [filters, setFilters] = React.useState<DocumentsTableFilters>({
     search: "",
-    level: "all",
-    status: "all",
   });
 
   // Debounce the search so we don't fire a request on every keystroke.
@@ -40,12 +38,10 @@ export function KnowledgeBaseView({
   const query = React.useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      level: filters.level === "all" ? undefined : filters.level,
-      status: filters.status === "all" ? undefined : filters.status,
       page: 1,
       pageSize: 50,
     }),
-    [debouncedSearch, filters.level, filters.status],
+    [debouncedSearch],
   );
 
   const { data, isLoading, isFetching } = useKnowledgeDocuments(query);
