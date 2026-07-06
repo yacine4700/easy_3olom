@@ -1,6 +1,9 @@
 "use client";
 
-import { ChevronsUpDown, LogOut, Settings, User } from "lucide-react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { ChevronsUpDown, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,23 +15,39 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * Admin account menu.
- *
- * Phase 1: shows a placeholder admin profile. Once NextAuth is wired in,
- * replace the static identity with the session user and turn "Sign out"
- * into a real action.
+ * Admin account menu with real Supabase auth session.
+ * Shows the logged-in user's email and provides sign-out.
  */
 export function UserMenu() {
-  const initials = "AD";
+  const router = useRouter();
+  const [email, setEmail] = React.useState<string>("");
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setEmail(user.email);
+    });
+  }, []);
+
+  const initials = email ? email[0].toUpperCase() : "؟";
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    toast.success("تم تسجيل الخروج");
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="h-9 gap-2 px-1.5 pr-2 text-sm font-normal text-muted-foreground hover:text-foreground"
+          className="h-9 gap-2 px-1.5 pe-2 text-sm font-normal text-muted-foreground hover:text-foreground"
         >
           <Avatar className="size-7">
             <AvatarFallback className="bg-brand text-brand-foreground text-[11px] font-semibold">
@@ -46,21 +65,15 @@ export function UserMenu() {
       >
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="text-sm font-medium text-foreground">المشرف</span>
-          <span className="text-xs font-normal text-muted-foreground">
-            admin@easy3olom.dz
+          <span className="text-muted-foreground text-xs font-normal truncate" dir="ltr">
+            {email || "—"}
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="size-4" />
-          الملف الشخصي
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="size-4" />
-          الإعدادات
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive focus:text-destructive">
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={handleSignOut}
+        >
           <LogOut className="size-4" />
           تسجيل الخروج
         </DropdownMenuItem>

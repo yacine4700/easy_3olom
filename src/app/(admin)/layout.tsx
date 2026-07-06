@@ -1,25 +1,44 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
+
 import { AppShell } from "@/components/layout/app-shell";
+import { createClient } from "@/lib/supabase/client";
+import { Loader2 } from "lucide-react";
 
 /**
- * Admin route group layout.
+ * Admin route group layout (Client Component to avoid hydration mismatch).
  *
- * Every page under `(admin)/` shares the application shell (sidebar + topbar
- * + footer). Keeping the shell here — instead of in the root layout — means
- * future unauthenticated surfaces (e.g. /login) can live outside this group
- * and render chrome-free.
- *
- * IMPORTANT: this layout MUST be a Client Component. When a Server Component
- * renders a Client Component tree that uses Radix (which relies on useId),
- * the Server→Client boundary shifts the useId tree between SSR and hydration,
- * causing a React 19 hydration mismatch on every Radix id. Making the layout
- * a Client Component eliminates the boundary.
+ * Client-side auth check: if no session, redirect to /login.
+ * The middleware provides the primary server-side protection.
  */
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const [checked, setChecked] = React.useState(false);
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.replace("/login");
+      } else {
+        setChecked(true);
+      }
+    });
+  }, [router]);
+
+  if (!checked) {
+    return (
+      <div className="flex min-h-svh items-center justify-center">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
+  }
+
   return <AppShell>{children}</AppShell>;
 }
