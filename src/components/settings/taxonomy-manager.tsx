@@ -2,19 +2,29 @@
 
 import * as React from "react";
 import { Plus, Trash2, ChevronDown, ChevronLeft } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useTaxonomy, useUpdateTaxonomy } from "@/hooks/queries/use-taxonomy";
 import {
@@ -32,6 +42,27 @@ export function TaxonomyManager() {
   const [expandedDomain, setExpandedDomain] = React.useState<string | null>(
     null,
   );
+
+  // Dialog state for adding domain
+  const [domainDialogOpen, setDomainDialogOpen] = React.useState(false);
+  const [newDomainName, setNewDomainName] = React.useState("");
+
+  // Dialog state for adding unit
+  const [unitDialogOpen, setUnitDialogOpen] = React.useState(false);
+  const [unitDialogDomain, setUnitDialogDomain] = React.useState<string | null>(
+    null,
+  );
+  const [newUnitName, setNewUnitName] = React.useState("");
+
+  // Alert dialog for deleting domain
+  const [deleteDomainAlert, setDeleteDomainAlert] = React.useState<
+    string | null
+  >(null);
+
+  // Alert dialog for deleting unit
+  const [deleteUnitAlert, setDeleteUnitAlert] = React.useState<
+    { domain: string; unit: string } | null
+  >(null);
 
   // Local working copy
   const [local, setLocal] = React.useState<TaxonomyData | null>(null);
@@ -53,25 +84,25 @@ export function TaxonomyManager() {
     updateMutation.mutate(updated);
   }
 
-  function addDomain() {
-    const name = window.prompt("اسم المجال الجديد:");
-    if (!name?.trim()) return;
-    if (currentLevelData.domains.includes(name.trim())) {
-      toast.error("المجال موجود مسبقاً");
-      return;
+  function handleAddDomain() {
+    const name = newDomainName.trim();
+    if (!name) return;
+    if (currentLevelData.domains.includes(name)) {
+      return; // duplicate — could show toast
     }
     const updated: TaxonomyData = {
       ...local,
       [activeLevel]: {
-        domains: [...currentLevelData.domains, name.trim()],
-        units: { ...currentLevelData.units, [name.trim()]: [] },
+        domains: [...currentLevelData.domains, name],
+        units: { ...currentLevelData.units, [name]: [] },
       },
     };
     save(updated);
+    setNewDomainName("");
+    setDomainDialogOpen(false);
   }
 
-  function removeDomain(domain: string) {
-    if (!window.confirm(`حذف المجال "${domain}"؟`)) return;
+  function handleRemoveDomain(domain: string) {
     const newDomains = currentLevelData.domains.filter((d) => d !== domain);
     const newUnits = { ...currentLevelData.units };
     delete newUnits[domain];
@@ -80,26 +111,31 @@ export function TaxonomyManager() {
       [activeLevel]: { domains: newDomains, units: newUnits },
     });
     if (expandedDomain === domain) setExpandedDomain(null);
+    setDeleteDomainAlert(null);
   }
 
-  function addUnit(domain: string) {
-    const name = window.prompt(`إضافة وحدة للمجال "${domain}":`);
-    if (!name?.trim()) return;
-    const existing = currentLevelData.units[domain] ?? [];
-    if (existing.includes(name.trim())) {
-      toast.error("الوحدة موجودة مسبقاً");
-      return;
-    }
+  function handleAddUnit() {
+    if (!unitDialogDomain) return;
+    const name = newUnitName.trim();
+    if (!name) return;
+    const existing = currentLevelData.units[unitDialogDomain] ?? [];
+    if (existing.includes(name)) return;
     save({
       ...local,
       [activeLevel]: {
         ...currentLevelData,
-        units: { ...currentLevelData.units, [domain]: [...existing, name.trim()] },
+        units: {
+          ...currentLevelData.units,
+          [unitDialogDomain]: [...existing, name],
+        },
       },
     });
+    setNewUnitName("");
+    setUnitDialogOpen(false);
+    setUnitDialogDomain(null);
   }
 
-  function removeUnit(domain: string, unit: string) {
+  function handleRemoveUnit(domain: string, unit: string) {
     const existing = currentLevelData.units[domain] ?? [];
     save({
       ...local,
@@ -111,6 +147,7 @@ export function TaxonomyManager() {
         },
       },
     });
+    setDeleteUnitAlert(null);
   }
 
   return (
@@ -118,35 +155,45 @@ export function TaxonomyManager() {
       <CardHeader>
         <CardTitle className="text-base">تصنيف المعرفة</CardTitle>
         <p className="text-muted-foreground text-sm">
-          المجالات والوحدات حسب المستوى الدراسي — تُستخدم كقوائم منسدلة في نموذج إضافة المعرفة
+          المجالات والوحدات حسب المستوى الدراسي — تُستخدم كقوائم منسدلة في
+          نموذج إضافة المعرفة
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Level selector */}
         <div className="flex gap-2">
-          {(Object.entries(LEVEL_LABELS) as [EducationLevelKey, string][]).map(
-            ([val, label]) => (
-              <Button
-                key={val}
-                variant={activeLevel === val ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveLevel(val)}
-                className={cn(
-                  activeLevel === val &&
-                    "bg-brand text-brand-foreground hover:bg-brand/90",
-                )}
-              >
-                {label}
-              </Button>
-            ),
-          )}
+          {(
+            Object.entries(LEVEL_LABELS) as [EducationLevelKey, string][]
+          ).map(([val, label]) => (
+            <Button
+              key={val}
+              variant={activeLevel === val ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveLevel(val)}
+              className={cn(
+                activeLevel === val &&
+                  "bg-brand text-brand-foreground hover:bg-brand/90",
+              )}
+            >
+              {label}
+            </Button>
+          ))}
         </div>
 
         {/* Domains list */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm">المجالات ({currentLevelData.domains.length})</Label>
-            <Button variant="outline" size="sm" onClick={addDomain}>
+            <Label className="text-sm">
+              المجالات ({currentLevelData.domains.length})
+            </Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setNewDomainName("");
+                setDomainDialogOpen(true);
+              }}
+            >
               <Plus className="size-4" />
               مجال
             </Button>
@@ -162,10 +209,7 @@ export function TaxonomyManager() {
                 const isExpanded = expandedDomain === domain;
                 const units = currentLevelData.units[domain] ?? [];
                 return (
-                  <div
-                    key={domain}
-                    className="rounded-md border"
-                  >
+                  <div key={domain} className="rounded-md border">
                     {/* Domain header */}
                     <div className="flex items-center justify-between p-2.5">
                       <button
@@ -189,7 +233,7 @@ export function TaxonomyManager() {
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground hover:text-destructive size-7"
-                        onClick={() => removeDomain(domain)}
+                        onClick={() => setDeleteDomainAlert(domain)}
                         aria-label="حذف المجال"
                       >
                         <Trash2 className="size-3.5" />
@@ -198,7 +242,7 @@ export function TaxonomyManager() {
 
                     {/* Units (expanded) */}
                     {isExpanded && (
-                      <div className="border-t p-2.5 space-y-1.5">
+                      <div className="space-y-1.5 border-t p-2.5">
                         {units.length === 0 ? (
                           <p className="text-muted-foreground py-2 text-center text-xs">
                             لا توجد وحدات
@@ -214,7 +258,9 @@ export function TaxonomyManager() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-muted-foreground hover:text-destructive size-6"
-                                onClick={() => removeUnit(domain, unit)}
+                                onClick={() =>
+                                  setDeleteUnitAlert({ domain, unit })
+                                }
                                 aria-label="حذف الوحدة"
                               >
                                 <Trash2 className="size-3" />
@@ -226,7 +272,11 @@ export function TaxonomyManager() {
                           variant="outline"
                           size="sm"
                           className="w-full"
-                          onClick={() => addUnit(domain)}
+                          onClick={() => {
+                            setUnitDialogDomain(domain);
+                            setNewUnitName("");
+                            setUnitDialogOpen(true);
+                          }}
                         >
                           <Plus className="size-3.5" />
                           إضافة وحدة
@@ -240,6 +290,140 @@ export function TaxonomyManager() {
           )}
         </div>
       </CardContent>
+
+      {/* Add Domain Dialog */}
+      <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>إضافة مجال جديد</DialogTitle>
+            <DialogDescription>
+              أدخل اسم المجال للمستوى: {LEVEL_LABELS[activeLevel]}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-domain">اسم المجال</Label>
+            <Input
+              id="new-domain"
+              value={newDomainName}
+              onChange={(e) => setNewDomainName(e.target.value)}
+              placeholder="مثال: التخصص الوظيفي للبروتينات"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddDomain();
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDomainDialogOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleAddDomain}
+              disabled={!newDomainName.trim()}
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              إضافة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Unit Dialog */}
+      <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>إضافة وحدة جديدة</DialogTitle>
+            <DialogDescription>
+              {unitDialogDomain
+                ? `أدخل اسم الوحدة للمجال: ${unitDialogDomain}`
+                : "أدخل اسم الوحدة"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-unit">اسم الوحدة</Label>
+            <Input
+              id="new-unit"
+              value={newUnitName}
+              onChange={(e) => setNewUnitName(e.target.value)}
+              placeholder="مثال: التركيب الضوئي"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddUnit();
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleAddUnit}
+              disabled={!newUnitName.trim()}
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              إضافة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Domain Confirmation */}
+      <AlertDialog
+        open={deleteDomainAlert !== null}
+        onOpenChange={(open) => !open && setDeleteDomainAlert(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف المجال؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف المجال &quot;{deleteDomainAlert}&quot; وجميع وحداته. لا
+              يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() =>
+                deleteDomainAlert && handleRemoveDomain(deleteDomainAlert)
+              }
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Unit Confirmation */}
+      <AlertDialog
+        open={deleteUnitAlert !== null}
+        onOpenChange={(open) => !open && setDeleteUnitAlert(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الوحدة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف الوحدة &quot;{deleteUnitAlert?.unit}&quot; من المجال
+              &quot;{deleteUnitAlert?.domain}&quot;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() =>
+                deleteUnitAlert &&
+                handleRemoveUnit(deleteUnitAlert.domain, deleteUnitAlert.unit)
+              }
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
