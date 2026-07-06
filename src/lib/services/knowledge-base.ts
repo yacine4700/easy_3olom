@@ -46,10 +46,22 @@ export async function getKnowledgeBaseStats() {
 }
 
 // WRITES → webhook only
+
+/** Convert keywords array to comma-separated string (Arabic comma) for the webhook payload. */
+function keywordsToString(keywords: string[] | null): string {
+  if (!keywords || keywords.length === 0) return "";
+  return keywords.join("، ");
+}
+
 export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInput): Promise<KnowledgeDocument> {
   const result = await notifyWebhook("knowledge", "create", {
-    level: input.level, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
-    content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
+    level: input.level,
+    domain: input.domain ?? "",
+    unit: input.unit ?? "",
+    title: input.title,
+    content: input.content ?? "",
+    keywords: keywordsToString(input.keywords ?? null),
+    bot_instructions: input.botInstructions ?? "",
   });
   if (!result.success) throw new Error(result.error);
   return { id: "", title: input.title, content: input.content ?? null, domain: input.domain ?? null,
@@ -58,8 +70,14 @@ export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInpu
 
 export async function updateKnowledgeDocument(id: string, input: UpdateKnowledgeDocumentInput): Promise<KnowledgeDocument | null> {
   const result = await notifyWebhook("knowledge", "update", {
-    id, level: input.level ?? null, domain: input.domain ?? null, unit: input.unit ?? null, title: input.title,
-    content: input.content ?? null, keywords: input.keywords ?? null, bot_instructions: input.botInstructions ?? null,
+    id,
+    level: input.level ?? "3AS",
+    domain: input.domain ?? "",
+    unit: input.unit ?? "",
+    title: input.title ?? "",
+    content: input.content ?? "",
+    keywords: keywordsToString(input.keywords ?? null),
+    bot_instructions: input.botInstructions ?? "",
   });
   if (!result.success) throw new Error(result.error);
   return { id, title: input.title ?? "", content: input.content ?? null, domain: input.domain ?? null,
