@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/";
@@ -41,6 +41,61 @@ export default function LoginPage() {
   }
 
   return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-background space-y-4 rounded-xl border p-6 shadow-sm"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="email">البريد الإلكتروني</Label>
+        <div className="relative">
+          <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2" />
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@example.com"
+            className="ps-9"
+            required
+            autoComplete="email"
+            autoFocus
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">كلمة المرور</Label>
+        <div className="relative">
+          <Lock className="text-muted-foreground pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2" />
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="ps-9"
+            required
+            autoComplete="current-password"
+          />
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        disabled={loading}
+        className="bg-brand text-brand-foreground hover:bg-brand/90 w-full"
+      >
+        {loading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : null}
+        تسجيل الدخول
+      </Button>
+    </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="bg-muted/30 flex min-h-svh items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
@@ -54,57 +109,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-background space-y-4 rounded-xl border p-6 shadow-sm"
+        {/* Form wrapped in Suspense for useSearchParams */}
+        <React.Suspense
+          fallback={
+            <div className="flex justify-center py-8">
+              <Loader2 className="text-muted-foreground size-6 animate-spin" />
+            </div>
+          }
         >
-          <div className="space-y-2">
-            <Label htmlFor="email">البريد الإلكتروني</Label>
-            <div className="relative">
-              <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2" />
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-                className="ps-9"
-                required
-                autoComplete="email"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">كلمة المرور</Label>
-            <div className="relative">
-              <Lock className="text-muted-foreground pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2" />
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="ps-9"
-                required
-                autoComplete="current-password"
-              />
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="bg-brand text-brand-foreground hover:bg-brand/90 w-full"
-          >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            تسجيل الدخول
-          </Button>
-        </form>
+          <LoginForm />
+        </React.Suspense>
 
         <p className="text-muted-foreground mt-6 text-center text-xs">
           لوحة تحكم خاصة بالمشرفين فقط
