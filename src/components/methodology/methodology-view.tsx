@@ -19,7 +19,7 @@ import type { Methodology } from "@/types/domain";
 export function MethodologyView({
   initialItems,
 }: {
-  initialItems: Methodology[];
+  initialItems?: Methodology[];
 }) {
   const [filters, setFilters] = React.useState<MethodologyTableFilters>({
     search: "",
@@ -42,7 +42,7 @@ export function MethodologyView({
   );
 
   const { data, isLoading, isFetching } = useMethodologies(query);
-  const items = data?.items ?? initialItems;
+  const items = data?.items ?? initialItems ?? [];
 
   // Dialog state
   const [editOpen, setEditOpen] = React.useState(false);

@@ -21,7 +21,7 @@ import type { StudentQuestion } from "@/types/domain";
 export function StudentQuestionsView({
   initialItems,
 }: {
-  initialItems: StudentQuestion[];
+  initialItems?: StudentQuestion[];
 }) {
   const [filters, setFilters] = React.useState<QuestionsTableFilters>({
     search: "",
@@ -46,7 +46,7 @@ export function StudentQuestionsView({
   );
 
   const { data, isLoading, isFetching } = useStudentQuestions(query);
-  const items = data?.items ?? initialItems;
+  const items = data?.items ?? initialItems ?? [];
 
   // Dialog state
   const [editOpen, setEditOpen] = React.useState(false);

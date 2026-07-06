@@ -20,7 +20,7 @@ import type { GlossaryTerm } from "@/types/domain";
 export function GlossaryView({
   initialItems,
 }: {
-  initialItems: GlossaryTerm[];
+  initialItems?: GlossaryTerm[];
 }) {
   const [filters, setFilters] = React.useState<TermsTableFilters>({
     search: "",
@@ -43,7 +43,7 @@ export function GlossaryView({
   );
 
   const { data, isLoading, isFetching } = useGlossaryTerms(query);
-  const items = data?.items ?? initialItems;
+  const items = data?.items ?? initialItems ?? [];
 
   // Dialog state
   const [editOpen, setEditOpen] = React.useState(false);

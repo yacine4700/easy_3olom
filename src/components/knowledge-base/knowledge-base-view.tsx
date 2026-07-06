@@ -22,7 +22,7 @@ import type { KnowledgeDocument } from "@/types/domain";
 export function KnowledgeBaseView({
   initialItems,
 }: {
-  initialItems: KnowledgeDocument[];
+  initialItems?: KnowledgeDocument[];
 }) {
   const [filters, setFilters] = React.useState<DocumentsTableFilters>({
     search: "",
@@ -48,7 +48,7 @@ export function KnowledgeBaseView({
 
   // Use initial items on first render to avoid a loading flash; once the
   // query returns, prefer its data.
-  const items = data?.items ?? initialItems;
+  const items = data?.items ?? initialItems ?? [];
 
   // Dialog state
   const [editOpen, setEditOpen] = React.useState(false);
