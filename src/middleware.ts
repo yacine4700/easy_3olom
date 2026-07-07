@@ -4,40 +4,57 @@ import { createServerClient } from "@supabase/ssr";
 /**
  * Middleware: refreshes the Supabase auth session on every request
  * and protects admin routes (redirects to /login if not authenticated).
+ *
+ * CRITICAL: must be defensive — if Supabase env vars are missing or the
+ * auth call fails, the middleware must NOT throw (Vercel returns
+ * MIDDLEWARE_INVOCATION_FAILED / 500). Instead, treat errors as "no user"
+ * and let the (admin) layout handle the redirect.
  */
 export async function middleware(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If env vars are missing, skip auth — let the layout handle protection
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next({ request });
+  }
+
   const response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  let user = null;
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response.cookies.set({
-            name,
-            value,
-            ...cookiesToSet.find((c) => c.name === name)?.options,
-          });
+          try {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set({ name, value, ...options }),
+            );
+          } catch {
+            // ignore cookie errors
+          }
         },
       },
-    },
-  );
+    });
 
-  // Refresh the session (this also sets the cookies on the response)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    // Refresh the session (this also sets the cookies on the response)
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    // If anything fails, treat as unauthenticated — don't crash the request
+    user = null;
+  }
 
   const { pathname } = request.nextUrl;
 
-  // Protected routes: everything except /login and API routes and static assets
+  // Protected routes: everything except /login, API routes, and static assets
   const isProtected =
     !pathname.startsWith("/login") &&
     !pathname.startsWith("/api") &&
