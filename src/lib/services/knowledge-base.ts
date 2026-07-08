@@ -62,6 +62,7 @@ export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInpu
     content: input.content ?? "",
     keywords: keywordsToString(input.keywords ?? null),
     bot_instructions: input.botInstructions ?? "",
+    embedding_required: true,
   });
   if (!result.success) throw new Error(result.error);
   return { id: "", title: input.title, content: input.content ?? null, domain: input.domain ?? null,
@@ -69,6 +70,10 @@ export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInpu
 }
 
 export async function updateKnowledgeDocument(id: string, input: UpdateKnowledgeDocumentInput): Promise<KnowledgeDocument | null> {
+  // embedding_required: true only when content was actually changed in this update.
+  // If content is undefined (not sent), no embedding is needed.
+  const embeddingRequired = input.content !== undefined;
+
   const result = await notifyWebhook("knowledge", "update", {
     id,
     level: input.level ?? "3AS",
@@ -78,6 +83,7 @@ export async function updateKnowledgeDocument(id: string, input: UpdateKnowledge
     content: input.content ?? "",
     keywords: keywordsToString(input.keywords ?? null),
     bot_instructions: input.botInstructions ?? "",
+    embedding_required: embeddingRequired,
   });
   if (!result.success) throw new Error(result.error);
   return { id, title: input.title ?? "", content: input.content ?? null, domain: input.domain ?? null,

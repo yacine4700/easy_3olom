@@ -1,0 +1,300 @@
+Stage Summary:
+- Architecture decision: shell lives in `src/app/(admin)/layout.tsx` (route group) so future unauthenticated pages (login) can render chrome-free.
+- Architecture decision: sidebar nav is data-driven from `src/config/navigation.ts`; enabling a module = build route/page + flip `disabled:false` + drop badge.
+- Color: neutral base + emerald `--brand` accent (fits "life sciences" + Supabase-dashboard aesthetic). No indigo/blue used.
+- Open item for Phase 2+: data layer. Environment ships Prisma/SQLite; user requested Supabase. Decision deferred — no DB needed in Phase 1. When Knowledge Base module starts, choose between installing `@supabase/supabase-js` (remote project, needs credentials) vs adapting.
+- Server Actions vs API routes: user requested Server Actions; platform convention prefers API routes. Deferred to data-layer phase.
+- Phase 1 is complete and browser-verified. Awaiting user approval before starting Phase 2.
+
+---
+Task ID: 2
+Agent: main (orchestrator)
+Task: Phase 2 — Knowledge Base module (first functional module). Establish the data/service/API/CRUD pattern all future modules will follow.
+
+Work Log:
+- Resolved deferred Phase-1 decisions: (1) Data layer = Prisma/SQLite behind a service/repository interface (Supabase swap = one file, types/validators stay stable). (2) API routes (not Server Actions) per platform convention; TanStack Query on client.
+- Prisma: added `KnowledgeDocument` model (title, source, level, status, chunkCount, embeddingReady + timestamps, indexes on level/status). SQLite has no enums → level/status stored as strings, constrained at Zod layer. `bun run db:push` applied.
+- Seed script `scripts/seed-knowledge-base.ts` → 8 representative documents (French/Arabic curriculum titles across 1AS/2AS/3AS/AS levels, mixed statuses). Re-runnable.
+- Tuned `db.ts` log from `['query']` → `['warn','error']` to keep dev.log clean.
+- Validators `src/lib/validators/knowledge-base.ts`: Zod create/update/list-query schemas (single source of truth, shared by client form + server API).
+- Constants `src/lib/constants/education.ts`: EDUCATION_LEVELS (1AS/2AS/3AS/AS with Arabic hints) + CONTENT_STATUSES (draft/review/published/archived) + label helpers.
+- Service `src/lib/services/knowledge-base.ts`: list (filters+pagination), get, create, update, delete, getKnowledgeBaseStats. Repository pattern — only file touching Prisma for this module; returns domain types (Date→ISO).
+- API helper `src/lib/api.ts`: ok/created/noContent/badRequest/notFound/serverError + `validate()` wrapper returning Zod field errors.
+- API routes: `src/app/api/knowledge-base/route.ts` (GET list, POST create) + `src/app/api/knowledge-base/[id]/route.ts` (GET, PATCH, DELETE). All validate input via Zod.
+- Fetch helper `src/lib/fetch.ts`: `fetchJson` + `ApiError` (carries status + field errors) for client hooks.
+- TanStack Query hooks `src/hooks/queries/use-knowledge-base.ts`: useKnowledgeDocuments (list, placeholderData), useCreate/Update/Delete with cache invalidation + sonner toasts. Colocated query keys.
+- Shared UI: `status-badge.tsx` (icon+color per status), `level-badge.tsx` (color per level), `knowledge-base-stats.tsx` (3 stat cards).
+- Form `document-form.tsx`: RHF + zodResolver, controlled Select/Switch bridged into RHF, server-validated schema reused. Handles create + edit via defaultValues.
+- Dialogs: `document-dialog.tsx` (create/edit in one dialog, picks mutation), `delete-document-dialog.tsx` (AlertDialog confirmation, destructive styling).
+- Table `documents-table.tsx` + `columns.tsx`: TanStack Table with sorting, pagination, row selection, row-actions dropdown, skeleton loading state, empty state. shadcn Table has overflow-x-auto built-in (mobile horizontal scroll).
+- Toolbar `table-toolbar.tsx`: search (debounced in view), level/status Selects, Clear button, "New document" brand button.
+- Orchestrator `knowledge-base-view.tsx`: owns filter state + dialogs, debounced search, passes server-fetched initialItems to avoid loading flash.
+- Page `src/app/(admin)/knowledge-base/page.tsx`: Server Component, fetches initial list + stats in parallel from service, renders header + stats + KnowledgeBaseView.
+- Enabled nav item in `config/navigation.ts` (removed disabled/badge).
+- Swapped root layout Toaster from radix → sonner (`richColors position="bottom-right"`) for hook toasts.
+- Lint: 0 errors, 2 warnings (React Compiler notes on RHF `watch()` + TanStack `useReactTable()` — inherent to requested libraries, non-blocking).
+
+Self-verification (Agent Browser):
+- /knowledge-base renders with title "Knowledge Base · Easy 3olom Admin", no runtime/console errors.
+- 8 seeded rows + 3 stat cards + filters + New button render correctly.
+- CREATE: opened New dialog → filled title/source/chunkCount/switch → submit → 9th row "La photosynthèse…" appears. No errors.
+- UPDATE: row actions → Edit → dialog prefilled → changed Status Draft→Published → Save → row shows "Published". PATCH 200.
+- FILTER: status=Published → 4 rows. SEARCH: "immunitaire" (+Published) → 1 row. Both confirmed via eval.
+- DELETE: row actions → Delete → AlertDialog → confirm → row removed, back to 8 rows. DELETE 204.
+- Nav active state correct on both routes; sidebar navigation KB↔Dashboard works.
+- Mobile (375px): table horizontally scrollable (scrollWidth 881 > clientWidth 341); footer pushed down naturally (gapBelow=0).
+- dev.log shows full request chain: GET list 200, POST create, PATCH 200, GET ?status=published 200, GET ?search=immunitaire&status=published 200, DELETE 204.
+
+Stage Summary:
+- Established the reusable vertical slice pattern for all future modules: schema → service (repository) → validators → API routes → fetch helper → TanStack Query hooks → small UI components → orchestrator view → Server Component page. Each future module (Glossary, Methodology, …) can copy this skeleton.
+- Clean Architecture honored: UI never imports Prisma; only `services/*` touches the DB. Swapping to Supabase = re-implement `services/knowledge-base.ts` only.
+- Server-Component-first: pages fetch initial data server-side (instant first paint) then hydrate to interactive TanStack Query CRUD on client.
+- Verification covers the full CRUD golden path + filters + search + responsive + footer. Phase 2 complete and browser-verified. Awaiting approval for Phase 3.
+
+---
+Task ID: 3
+Agent: main (orchestrator)
+Task: Phase 3 — Glossary module (bilingual FR + AR). Reuse the Phase 2 vertical-slice pattern to validate it generalizes; add justified bilingual domain fields.
+
+Work Log:
+- Architecture decision: Glossary is bilingual (FR term/definition + AR term/definition). Justified — Algerian secondary science is taught bilingually (French textbooks, Arabic instruction); glossary must serve both to feed the Arabic-answering RAG assistant.
+- Updated `GlossaryTerm` domain type to bilingual (term, termAr, definition, definitionAr, level, status).
+- Prisma: added `GlossaryTerm` model (term, termAr, definition, definitionAr, level, status + timestamps, indexes on level/status). `bun run db:push` applied + `db:generate`.
+- Refactor: extracted `status-badge.tsx` + `level-badge.tsx` from `components/knowledge-base/` → `components/shared/` (now reused by KB + Glossary). Updated KB `columns.tsx` import; deleted KB-local copies. Regression-verified KB still renders (8 rows, badges intact).
+- Validators `lib/validators/glossary.ts`: bilingual Zod schemas (FR fields with FR messages, AR fields with AR messages + 2000-char cap). Reused level/status enums from constants.
+- Service `lib/services/glossary.ts`: list (search across ALL 4 fields — FR+AR term+definition — so an Arabic query finds French-sourced content and vice versa), get, create, update, delete, getGlossaryStats. Repository pattern, only file touching Prisma for this module.
+- API routes: `api/glossary/route.ts` (GET list, POST create) + `api/glossary/[id]/route.ts` (GET, PATCH, DELETE). All Zod-validated.
+- TanStack Query hooks `hooks/queries/use-glossary.ts`: useGlossaryTerms (placeholderData), useCreate/Update/Delete with cache invalidation + sonner toasts. Colocated keys.
+- UI components in `components/glossary/`:
+  - `term-form.tsx`: RHF + Zod, bilingual grid; Arabic fields use `dir="rtl"` + `lang="ar"` for correct rendering/input direction; Arabic error messages also `dir="rtl"`.
+  - `term-dialog.tsx` (create/edit in one, 2xl width for bilingual grid) + `delete-term-dialog.tsx` (shows both FR + AR term in confirmation).
+  - `columns.tsx`: term cell shows FR (medium) + AR (muted, dir=rtl, lang=ar) stacked; truncated definition; level/status shared badges; row actions.
+  - `terms-table.tsx`: TanStack Table (sort by term asc default, paginate, select, skeleton/empty states).
+  - `terms-table-toolbar.tsx`: search (placeholder "Search FR or AR…") + level/status filters + Clear + brand "New term".
+  - `glossary-stats.tsx`: 3 cards (Total terms, Published, Bilingual FR+AR with Languages icon).
+  - `glossary-view.tsx`: client orchestrator (debounced search, dialogs).
+- Page `app/(admin)/glossary/page.tsx`: Server Component, parallel fetch initial list + stats, header with "FR · AR" badge + Arabic subject subtitle.
+- Seed `scripts/seed-glossary.ts`: 12 real bilingual biology terms (Cellule/خلية, ADN/الحمض النووي..., Photosynthèse/التركيب الضوئي, Mitose/الانقسام المتساوي, Méiose/الانقسام المنصف, Chromosome/صبغي, Enzyme/أنزيم, Membrane plasmique/الغشاء البلازمي, Mitochondrie/المتقدرة, Génome/المجموع المورثي, Osmose/التناضح, Ribosome/الريبوزوم) with full FR+AR definitions, mixed levels/statuses.
+- Enabled nav item in `config/navigation.ts`.
+- Hit one issue: dev server cached the pre-regeneration Prisma Client → `db.glossaryTerm` undefined → 500. Fixed by restarting dev server (kill + nohup bun run dev). Root cause: long-running Node process caches the old @prisma/client module; `db:push` regenerates on disk but the running process keeps the stale import. Lesson for future schema additions: restart dev server after db:push.
+- Lint: 0 errors, 4 warnings (same React Compiler notes on RHF watch() + TanStack useReactTable(), now across KB + Glossary forms/tables — inherent to requested libraries).
+
+Self-verification (Agent Browser):
+- /glossary renders with title "Glossary · Easy 3olom Admin", no runtime/console errors after dev restart.
+- 12 seeded terms paginate (10 on page 1, 2 on page 2), 3 stat cards render.
+- RTL verified: 10 [dir=rtl] elements in table; first row shows FR "ADN" + AR "الحمض النووي الريبي منقوص الأكسجين" stacked.
+- CREATE: New term dialog → filled bilingual (Respiration cellulaire / التنفس الخلوي + FR/AR definitions) → set Published → submit → term appears on page 2 (alphabetical). No errors.
+- UPDATE: row actions → Edit → dialog prefilled with all bilingual values (FR + AR including RTL) → changed status Published→Draft + updated AR definition → Save → status shows "Draft". PATCH 200.
+- BILINGUAL SEARCH: searched Arabic "خلية" → returned 4 related terms (Cellule + 3 whose AR definitions mention خلية). Proves cross-language search across all 4 fields. Then searched "Respiration" → 2 results (Mitochondrie via definition match + Respiration cellulaire).
+- DELETE: row actions → Delete → AlertDialog shows "Cellule / خلية" → canceled (preserved seed). Then deleted test "Respiration cellulaire" → confirmed removed (filtered search drops to 1). DELETE 204.
+- Nav active state correct on Glossary + Dashboard; navigation works both ways.
+- Regression: KB module still fully functional after shared-badge refactor (8 rows, status/level badges render, no errors).
+- Mobile (375px): glossary renders, footer pinned (gapBelow=0).
+- dev.log confirms full request chain incl. Arabic URL-encoded search (search=%D8%AE%D9%84%D9%8A%D8%A9 200).
+
+Stage Summary:
+- Validated the Phase 2 vertical-slice pattern generalizes: Glossary shipped faster by mirroring schema→service→validators→API→hooks→components→page structure. Each future module follows the same skeleton.
+- Shared badge extraction (components/shared/) prevents duplication — first concrete DRY win across modules.
+- Bilingual FR+AR with proper RTL rendering is now a proven pattern reusable for Student Questions (Arabic student queries + FR/AR answers) and any future bilingual content.
+- New operational learning: restart dev server after Prisma schema changes (db:push regenerates client on disk, but the running process caches the old module).
+- 3 of 8 modules now live (Dashboard, Knowledge Base, Glossary). Remaining: Methodology, Learning Objectives, Student Questions, Analytics, Settings.
+- Phase 3 complete and browser-verified. Awaiting approval for Phase 4.
+
+---
+Task ID: 4
+Agent: main (orchestrator)
+Task: Phase 4 — Methodology module (bilingual FR + AR teaching sequences with pedagogical ordering). Parent of Learning Objectives (Phase 5). Proves the vertical-slice pattern generalizes a 3rd time.
+
+Work Log:
+- Corrected Phase 3 recommendation order: built Methodology (parent) BEFORE Learning Objectives (child) so the child can have a populated relational dropdown instead of an empty one retrofitted later.
+- Updated Methodology domain type to bilingual (title, titleAr, description, descriptionAr) + level + order + status. `order` sequences units within a level for pedagogical progression.
+- Prisma: added Methodology model (bilingual fields + level/status strings + order int + indexes). db:push + db:generate. Restarted dev server (per Phase 3 learning — running process caches old Prisma client).
+- Validators lib/validators/methodology.ts: bilingual Zod schemas (FR fields + AR fields with AR messages) + order (int 0-9999). Reused level/status enums.
+- Service lib/services/methodology.ts: list (search across all 4 FR+AR fields), get, create, update, delete, getMethodologyStats (total/published/levels-covered). KEY ADDITION: stable level-rank ordering (1AS<2AS<3AS<AS) via in-JS sort after fetch — SQLite can't order by a lookup expression. Returns rows in pedagogical (level, order) order.
+- API routes: api/methodology/route.ts (GET, POST) + api/methodology/[id]/route.ts (GET, PATCH, DELETE).
+  - Hit one issue: the collection route.ts was NOT written initially (the Write tool's first attempt failed on missing dir, I created the dir + [id] route but forgot to re-write the collection route). Symptom: page rendered via server-side service call (8 rows) but client TanStack refetch hit 404 → create POST also 404'd. Fixed by writing the missing route.ts. Lesson: verify both route files exist after creating API dirs.
+- TanStack Query hooks hooks/queries/use-methodology.ts: useMethodologies (placeholderData), useCreate/Update/Delete with cache invalidation + toasts.
+- UI components in components/methodology/: methodology-form (bilingual grid + order number field, dir=rtl for AR), methodology-dialog (create/edit, 2xl width), delete-methodology-dialog (shows FR/AR title), columns (# order badge + bilingual sequence title + level/status shared badges + row actions), methodology-table (TanStack, NO default client sort — preserves server pedagogical order; user can still click headers to re-sort), methodology-table-toolbar (search + level/status + New), methodology-stats (Total/Published/Levels covered), methodology-view (orchestrator).
+  - KEY FIX: initial client SortingState was [{order, asc}] which re-sorted by order across all levels, breaking the server's level-then-order pedagogical sequence. Changed to [] so server order is preserved. Verified: 1AS(1,2,3)→2AS(1,2)→3AS(1,2,3)→AS(1).
+- Page app/(admin)/methodology/page.tsx: Server Component, parallel fetch initial list + stats.
+- Seed scripts/seed-methodology.ts: 8 real bilingual teaching sequences across 1AS(2)/2AS(2)/3AS(3)/AS(1), ordered, mixed statuses.
+- Enabled nav item in config/navigation.ts.
+- Lint: 0 errors, 6 warnings (same React Compiler notes on RHF watch() + TanStack useReactTable(), now across 3 modules — inherent to requested libraries).
+
+Self-verification (Agent Browser):
+- /methodology renders "Methodology · Easy 3olom Admin", no errors after route fix + dev restart.
+- 8 seeded sequences; pedagogical ordering VERIFIED: 1AS(1,2)→2AS(1,2)→3AS(1,2,3)→AS(1).
+- Bilingual RTL verified: 8 [dir=rtl] elements; FR "La cellule..." + AR "الخلية: الوحدة..." stacked.
+- CREATE: New dialog → filled bilingual + order 3 + Published → submit (POST 201) → new sequence "La reproduction..." inserted at 1AS position 3. No errors.
+- UPDATE: Edit prefilled (bilingual + order 3 + Published) → changed order→1 + status→Draft → Save (PATCH) → status shows Draft, reordering applied. 
+- DELETE: row actions → Delete → AlertDialog shows FR/AR title → confirm (DELETE 204) → removed, back to 8 rows.
+- Nav active state correct; mobile (375px) renders, footer pinned (gapBelow=0).
+- Regression: KB module intact after shared-badge + new module additions (8 rows, no errors).
+
+Stage Summary:
+- 4 of 8 modules now live (Dashboard, Knowledge Base, Glossary, Methodology). The vertical-slice pattern now proven 3× (KB, Glossary, Methodology) — it scales cleanly.
+- New pattern addition: stable server-side ordering when SQLite can't express the sort (level-rank lookup). Client table preserves server order by defaulting to empty SortingState.
+- Bilingual FR+AR + RTL pattern now consistent across 2 modules (Glossary, Methodology); ready for reuse in Learning Objectives.
+- Methodology is the PARENT of Learning Objectives — Phase 5 will add a real relational dropdown (objectives → methodology) demonstrating the first parent-child module relationship.
+- Two operational learnings logged: (1) restart dev after Prisma schema changes; (2) verify both collection + [id] route files exist after creating API dirs.
+- Phase 4 complete and browser-verified. Awaiting approval for Phase 5 (Learning Objectives — first relational module).
+
+---
+Task ID: FIX-1
+Agent: main (orchestrator)
+Task: Solve console errors (cross-origin warning + React 19 hydration mismatch).
+
+Work Log:
+- Issue 1 — Next.js cross-origin dev warning: "Cross origin request detected from preview-chat-*.space-z.ai to /_next/* resource". The preview panel loads resources from a different subdomain (preview-chat-{session-id}.space-z.ai). Next.js 16 requires explicitly allowlisting these origins.
+  - Fix: added `allowedDevOrigins: ["*.space-z.ai"]` to next.config.ts. Wildcard covers the per-session subdomain.
+  - Required dev server restart (next.config changes need restart).
+  - Verified: warning gone from dev.log.
+
+- Issue 2 — React 19 hydration mismatch on Radix DropdownMenuTrigger (and SelectTrigger). Error: "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties." Diff showed `id="radix-_R_1qqitplb_"` (server) vs `id="radix-_R_emitplb_"` (client) — different useId tree paths. Appeared on ALL pages including Dashboard (shell-only), confirming root cause in the shell not module content.
+  - Root cause: `Topbar` and `UserMenu` were Server Components rendered as children of `SidebarInset` (a Client Component). In Next.js App Router, Server Components are "transparent" in the CLIENT React tree (they don't create React nodes), but during SSR they DO occupy tree positions. This asymmetry shifts every downstream `useId()` output, causing the Radix ID mismatch.
+  - First attempt: changed `useIsMobile` hook from `useState(undefined)` → `useState(false)` for deterministic initial value. Did NOT fix the issue (the `!!undefined === false` return was already deterministic).
+  - Actual fix: added `"use client"` to `Topbar` and `UserMenu`. Now the tree is Client → Client → Client (SidebarInset → Topbar → UserMenu → DropdownMenu) with no Server Component boundary, so useId paths are identical on server and client.
+  - Verified: hydration error gone on all 4 live pages (Dashboard, Knowledge Base, Glossary, Methodology). Console shows only standard React DevTools + HMR logs. Zero page errors. Dev log clean.
+  - Functionality regression check: UserMenu dropdown opens (Profile/Settings/Sign out), sidebar navigation works, table data renders (KB: 8 rows), no errors.
+
+Stage Summary:
+- Both console errors fully resolved. Console is now clean (only standard dev info logs).
+- Key learning: when a Server Component is rendered as a child of a Client Component, its Radix `useId` outputs can mismatch between SSR and hydration. Components that contain Radix primitives (DropdownMenu, Select, Tooltip, etc.) should be Client Components when they're inside Client Component trees. This is a React 19 + Next.js App Router + Radix interaction.
+- Lint: 0 errors, 6 warnings (unchanged React Compiler notes).
+
+---
+Task ID: 5-PIVOT
+Agent: main (orchestrator)
+Task: User redirect — abandon Learning Objectives module (no relation to Methodology); proceed directly to Student Questions.
+
+Work Log:
+- User instruction: "no relation between methodology and learning objectives, remove all learning objectives module, then pass to student questions".
+- Reverted Phase 5-a work: removed LearningObjective Prisma model + the `objectives` relation field from Methodology. Removed `MethodologyOption` type and bilingual/methodologyId additions from LearningObjective domain type (kept a minimal placeholder noting "NO relation to Methodology" per project decision). Fixed stale Methodology doc comment (no longer "Parent of LearningObjective").
+- Removed empty LO directories: src/app/(admin)/learning-objectives, src/app/api/learning-objectives, src/components/learning-objectives. (No service/validator/API/UI files had been written yet — only dirs + schema/type.)
+- db:push applied (drops LearningObjective table). Prisma Client regenerated. Dev server restarted. Verified: `p.learningObjective` = false, `methodology.objectives` = false.
+- Lint: 0 errors. Methodology module intact at Phase 4 state.
+- Nav: Learning Objectives remains "Soon"/disabled in config/navigation.ts (never enabled).
+
+Stage Summary:
+- Learning Objectives module fully removed. Project decision recorded: NO relation between Methodology and Learning Objectives.
+- Proceeding to Student Questions module next (Telegram-driven, read-heavy + answer editing, bilingual-aware).
+
+---
+Task ID: 6
+Agent: main (orchestrator)
+Task: Phase 6 — Student Questions module (Telegram-driven, read-heavy + answer editing). First module with NO create flow (questions arrive via Telegram/n8n pipeline). Bilingual-aware (Arabic student questions).
+
+Work Log:
+- Updated StudentQuestion domain type: added level (nullable EducationLevel — assistant may infer), telegramMessageId (traceability), kept telegramChatId + grounded. Documented read-heavy semantics.
+- Prisma: added StudentQuestion model (question, answer?, status default "new", level?, telegramChatId, telegramMessageId?, grounded default false + indexes on status/level). db:push + db:generate + dev restart.
+- Constants lib/constants/question.ts: QUESTION_STATUSES (new/answered/flagged) + label helper. Distinct from CONTENT_STATUSES (authored-content lifecycle).
+- Validators lib/validators/student-question.ts: updateStudentQuestionSchema (answer nullable, status enum, level nullable, grounded) + list query schema. NO create schema — questions arrive via Telegram.
+- Service lib/services/student-question.ts: list (search question+answer, filter status/level), get, update (partial fields), delete, getStats (total/new/answered/flagged/grounded). Repository pattern. No create method.
+- API routes: api/student-questions/route.ts (GET list only — NO POST) + api/student-questions/[id]/route.ts (GET, PATCH, DELETE).
+- TanStack Query hooks hooks/queries/use-student-question.ts: useStudentQuestions (placeholderData), useUpdate (answer/status/level/grounded), useDelete. Colocated keys. No create hook.
+- Shared QuestionStatusBadge components/shared/question-status-badge.tsx (new/answered/flagged with distinct icons+colors — sky/emerald/amber). Distinct from authored-content StatusBadge.
+- UI components in components/student-questions/:
+  - answer-form.tsx: KEY DIFFERENCE — shows read-only student question context (bg-muted panel, dir=auto) + editable answer Textarea + status Select + level Select (with "Unassigned" option) + grounded Switch. RHF + Zod.
+  - answer-dialog.tsx (wraps answer-form), delete-question-dialog.tsx (confirmation).
+  - columns.tsx: question (line-clamp-2) + answer preview (or "No answer yet" italic) + optional LevelBadge + QuestionStatusBadge + grounded indicator (ShieldCheck) + received time + row actions (Edit answer / Delete).
+  - questions-table.tsx: TanStack table (no default client sort — preserves server newest-first; pagination; select; skeleton/empty states).
+  - questions-table-toolbar.tsx: search + status filter + level filter + Clear. NO "New" button (questions arrive via Telegram).
+  - student-question-stats.tsx: 4 cards (Total/New/Answered/Flagged).
+  - student-questions-view.tsx: orchestrator (debounced search, dialogs).
+- Page app/(admin)/student-questions/page.tsx: Server Component, parallel fetch initial list + stats, header with "Telegram" badge.
+- Seed scripts/seed-student-questions.ts: 10 realistic bilingual questions (mostly Arabic, some French), mixed statuses (2 new, 6 answered, 2 flagged), realistic telegramChatId/messageId, grounded flags. Answers present for answered items, null for new.
+- Enabled nav item in config/navigation.ts.
+- Lint: 0 errors, 8 warnings (same React Compiler notes on RHF watch() + TanStack useReactTable(), now across 4 modules).
+
+Self-verification (Agent Browser):
+- /student-questions renders "Student Questions · Easy 3olom Admin", no errors, no hydration issues.
+- 10 seeded questions; 4 stat cards correct (Total 10, New 2, Answered 6, Flagged 2).
+- Arabic questions render correctly (RTL via dir=auto on question text).
+- EDIT ANSWER (core flow): opened "ما المقصود بالانزياح الجيني؟" (New, no answer) → answer dialog showed read-only question context + editable form → wrote Arabic answer + set status Answered + toggled grounded → Save (PATCH 200) → row updated: status "Answered", grounded "Yes", answer preview shows Arabic text. Verified the question text was NOT editable (read-only context panel).
+- FILTER: status=New → 1 result (the الانزياح one is now Answered, so only الحمض النووي remains New).
+- SEARCH: "مناعة" → 1 result (immunity question). Cross-field search confirmed.
+- DELETE: row actions → Delete → AlertDialog → confirm (DELETE 204) → removed, back to 9 rows.
+- Nav active state correct; Methodology regression intact (8 rows, no errors); mobile (375px) renders, footer pinned (gapBelow=0).
+- dev.log confirms full request chain: GET list 200, PATCH 200, DELETE 204, GET ?search=مناعة 200.
+
+Stage Summary:
+- 5 of 8 modules now live (Dashboard, Knowledge Base, Glossary, Methodology, Student Questions).
+- New pattern: read-heavy module with NO create flow. The vertical-slice pattern adapted cleanly — dropped the create schema/route/hook/button, added a read-only context panel in the editor. This pattern is reusable for any future ingestion-driven module.
+- Bilingual rendering via dir=auto (not hardcoded dir=rtl) since student questions can be Arabic OR French — a subtle but important difference from Glossary/Methodology where language fields are known.
+- Shared QuestionStatusBadge added to components/shared/ (distinct lifecycle from authored-content StatusBadge).
+- Remaining modules: Analytics, Settings.
+- Phase 6 complete and browser-verified.
+
+---
+Task ID: 7
+Agent: main (orchestrator)
+Task: Phase 7 — Analytics module. Read-only dashboard aggregating stats from all 4 data modules. Pure Server Component + client chart islands. No CRUD/API/mutations — simplest module pattern.
+
+Work Log:
+- Extended student-question service: added getStudentQuestionLevelDistribution (counts per level, stable order 1AS/2AS/3AS/AS/unassigned) + getRecentUnansweredQuestions (latest N "new" questions for the activity feed).
+- Built analytics components in components/analytics/:
+  - kpi-card.tsx (Server Component): compact card per module, links to module, tone variants (brand/muted/warn).
+  - status-donut-chart.tsx (Client): recharts PieChart donut for student-question status (new/answered/flagged), inner+outer radius, legend, empty state.
+  - readiness-bar-chart.tsx (Client): recharts grouped BarChart (total vs published across KB/Glossary/Methodology), CartesianGrid, tooltips, legend.
+  - level-bar-chart.tsx (Client): recharts horizontal BarChart (questions per level), per-bar Cell colors, empty state.
+  - recent-questions-feed.tsx (Server Component): latest 5 unanswered questions with status badge + relative time, links to module.
+- Page app/(admin)/analytics/page.tsx: PURE Server Component. Single Promise.all fetches all 6 data sources in parallel (kbStats, glossaryStats, methodologyStats, sqStats, sqLevels, recent). Computes grounding rate. Assembles chart datasets with a centralized color palette. Renders KPI grid + grounding callout + 2 chart rows (donut+readiness, level+feed). No API routes, no TanStack Query, no client state.
+- Enabled nav item in config/navigation.ts.
+- Lint: 0 errors, 8 warnings (unchanged React Compiler notes — analytics adds no RHF/TanStack so no new warnings).
+
+Self-verification (Agent Browser):
+- /analytics renders "Analytics · Easy 3olom Admin", no errors, no hydration issues.
+- KPI values correct: KB 8, Glossary 12, Methodology 8, Student Questions 9 (10 seeded − 1 deleted in Phase 6), Grounding rate 100%.
+- Charts render: 3 recharts-responsive-containers, 3 pie sectors (donut), 10 bar rectangles (6 readiness + 4 level). Verified via .recharts-pie-sector and .recharts-bar-rectangle selectors.
+- Recent feed: 1 item (only 1 "new" question remains after Phase 6 testing).
+- KPI card links work: KB card → /knowledge-base, Student Questions card → /student-questions (verified navigation + h1).
+- "View all" link in feed → /student-questions.
+- Nav active state correct ("Analytics"). Mobile (375px): 3 charts stack vertically, footer pinned (gapBelow=0).
+- dev.log: GET /analytics 200, no errors.
+
+Stage Summary:
+- 6 of 8 modules now live (Dashboard, Knowledge Base, Glossary, Methodology, Student Questions, Analytics).
+- New pattern: pure read-only Server Component module. The simplest pattern yet — no API routes, no TanStack Query, no mutations. All data fetched server-side in one parallel await, charts are client islands. This is the Server-Component-first ideal and contrasts nicely with the CRUD modules.
+- Charts use shadcn's chart.tsx wrapper (ChartContainer/ChartTooltip/ChartLegend) over recharts — consistent with the component library.
+- Centralized color palette in the page (LEVEL_COLORS, STATUS_COLORS) keeps chart theming in one place.
+- Remaining: Settings only (Learning Objectives deferred per user decision).
+- Phase 7 complete and browser-verified.
+
+---
+Task ID: 8
+Agent: main (orchestrator)
+Task: Phase 8 — Settings module (final module). Singleton configuration (key-value store) with sensitive value masking. New pattern: singleton config + secret handling.
+
+Work Log:
+- Prisma: added Setting model (key unique, value string, secret boolean, timestamps). Key-value store — flexible (new settings added without migrations). db:push + db:generate + dev restart.
+- Constants lib/constants/settings.ts: SETTING_DEFINITIONS registry (11 settings across 5 groups: General, Telegram, Gemini, n8n, Supabase). Each declares key, group, label, secret flag, placeholder, help, defaultValue. SETTING_GROUPS for section metadata. SECRET_MASK constant + isMaskedValue helper.
+- Validators lib/validators/settings.ts: updateSettingsSchema (record of string→string validated via refine against known keys — NOT z.enum which in Zod 4 requires ALL keys present). Initial z.enum approach caused 400; fixed with z.record(z.string(), z.string()) + refine.
+- Service lib/services/settings.ts: getAllSettings (seeds defaults on first call via ensureDefaults, returns grouped settings with secrets masked), updateSettings (skips secrets whose value is the mask or empty — preserves existing secrets). Returns SettingsByGroup[] with hasValue flags.
+- API route api/settings/route.ts: GET (returns all grouped, masked) + PUT (update multiple). No [id] route — singleton.
+- TanStack Query hooks hooks/queries/use-settings.ts: useSettings (staleTime 60s), useUpdateSettings (optimistic: setQueryData from server response).
+- UI components in components/settings/:
+  - setting-field.tsx: single field. For secrets: type="password" by default, reveal toggle (Eye/EyeOff), "Configured" checkmark when hasValue && !focused, monospace font.
+  - settings-form.tsx: full form. Stores groups state (with hasValue flags) + overrides map for dirty keys. Only sends dirty keys on save. After save, replaces full groups state from server response (keeps hasValue in sync). Sticky save bar with dirty count + Save button.
+- Page app/(admin)/settings/page.tsx: Server Component, fetches via getAllSettings (seeds defaults on first access), passes to SettingsForm.
+- Enabled nav item in config/navigation.ts.
+
+Bug fixes during verification:
+1. Zod 4 z.record(z.enum(...)) requires ALL enum keys present → 400 on partial update. Fixed: z.record(z.string(), z.string()) + refine for known keys.
+2. hasValue ("Configured") indicator not updating after save — form only updated values map, not the full groups state. Fixed: store full groups in state, replace from server response on save.
+
+Self-verification (Agent Browser):
+- /settings renders "Settings · Easy 3olom Admin", no errors, no hydration issues.
+- 5 sections render (General, Telegram Bot, Gemini AI, n8n Workflow, Supabase) with 11 fields. Defaults populated (workspace name "Easy 3olom Admin", subject "علوم الطبيعة والحياة", model "gemini-2.5-flash").
+- 5 secret fields correctly type="password" (Bot token, Gemini API key, n8n API key, Supabase anon key, Supabase service role key).
+- EDIT+SAVE: edited workspace name + set bot token → save bar "2 unsaved changes" → Save (PUT 200) → "All changes saved", values persisted.
+- SECRET PRESERVATION: edited only workspace name (bot token still masked) → Save → bot token still "Configured" (service skipped the masked value). Verified.
+- REVEAL TOGGLE: clicked Eye icon → input type changed password→text, button label "Reveal value"→"Hide value". Verified.
+- "Configured" indicator appears for secrets with a stored value, absent for empty secrets. Verified after bug fix.
+- Nav active state correct. Only "Learning Objectives" remains "Soon" (deferred per user decision). Mobile footer pinned (gapBelow=0).
+- Lint: 0 errors, 8 warnings (unchanged React Compiler notes).
+
+Stage Summary:
+- 7 of 8 modules now live (Dashboard, Knowledge Base, Glossary, Methodology, Student Questions, Analytics, Settings). Only Learning Objectives remains deferred.
+- New pattern: singleton configuration module with secret handling. Key features: (1) key-value store for flexibility, (2) typed registry for type safety, (3) secret masking in API responses, (4) skip-on-mask preservation so unchanged secrets aren't overwritten, (5) reveal toggle UX, (6) "Configured" indicator, (7) sticky save bar with dirty tracking.
+- Zod 4 learning: z.record(z.enum(...)) requires ALL keys — use z.record(z.string(), z.string()) + refine for partial records.
+- All modules complete. The Easy 3olom Admin console is feature-complete.
