@@ -38,14 +38,24 @@ export async function getMethodologyStats() {
 export async function createMethodology(input: CreateMethodologyInput): Promise<Methodology> {
   const result = await notifyWebhook("methodology", "create", {
     title: input.title, explanation: input.explanation ?? null, keywords: input.keywords ?? null,
+    embedding_required: true,
   });
   if (!result.success) throw new Error(result.error);
   return { id: "", title: input.title, explanation: input.explanation ?? null, keywords: input.keywords ?? null };
 }
 
 export async function updateMethodology(id: string, input: UpdateMethodologyInput): Promise<Methodology | null> {
+  // Fetch the existing record to compare explanation (the content field)
+  const existing = await getMethodology(id);
+  const oldExplanation = existing?.explanation ?? "";
+
+  // embedding_required: true only when explanation actually changed
+  const newExplanation = input.explanation ?? "";
+  const embeddingRequired = input.explanation !== undefined && newExplanation !== oldExplanation;
+
   const result = await notifyWebhook("methodology", "update", {
     id, title: input.title ?? null, explanation: input.explanation ?? null, keywords: input.keywords ?? null,
+    embedding_required: embeddingRequired,
   });
   if (!result.success) throw new Error(result.error);
   return { id, title: input.title ?? "", explanation: input.explanation ?? null, keywords: input.keywords ?? null };

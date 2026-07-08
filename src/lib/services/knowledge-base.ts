@@ -70,9 +70,13 @@ export async function createKnowledgeDocument(input: CreateKnowledgeDocumentInpu
 }
 
 export async function updateKnowledgeDocument(id: string, input: UpdateKnowledgeDocumentInput): Promise<KnowledgeDocument | null> {
-  // embedding_required: true only when content was actually changed in this update.
-  // If content is undefined (not sent), no embedding is needed.
-  const embeddingRequired = input.content !== undefined;
+  // Fetch the existing record to compare content
+  const existing = await getKnowledgeDocument(id);
+  const oldContent = existing?.content ?? "";
+
+  // embedding_required: true only when content actually changed
+  const newContent = input.content ?? "";
+  const embeddingRequired = input.content !== undefined && newContent !== oldContent;
 
   const result = await notifyWebhook("knowledge", "update", {
     id,
