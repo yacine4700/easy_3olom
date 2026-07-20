@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** POST /api/methodology — create a teaching sequence (writes go through the webhook). */
+/** POST /api/methodology — create a methodology rule (direct Supabase). */
 export async function POST(request: Request) {
   try {
     let body: unknown;

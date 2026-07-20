@@ -52,7 +52,7 @@ export function useMethodologies(query: ListMethodologiesQuery) {
   });
 }
 
-/** Create a teaching sequence (writes through the webhook). */
+/** Create a methodology rule (direct Supabase). */
 export function useCreateMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -63,13 +63,13 @@ export function useCreateMethodology() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
-      toast.success("تم الإرسال إلى Webhook");
+      toast.success("تم إنشاء القاعدة");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Update a teaching sequence (writes through the webhook). */
+/** Update a methodology rule (direct Supabase). */
 export function useUpdateMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -87,13 +87,13 @@ export function useUpdateMethodology() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
       qc.invalidateQueries({ queryKey: methodologyKeys.detail(data.id) });
-      toast.success("تم الإرسال إلى Webhook");
+      toast.success("تم تحديث القاعدة");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
 }
 
-/** Delete a teaching sequence (writes through the webhook). */
+/** Delete a methodology rule (direct Supabase). */
 export function useDeleteMethodology() {
   const qc = useQueryClient();
   return useMutation({
@@ -101,7 +101,7 @@ export function useDeleteMethodology() {
       fetchJson<void>(`/api/methodology/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: methodologyKeys.lists() });
-      toast.success("تم الإرسال إلى Webhook");
+      toast.success("تم حذف القاعدة");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });

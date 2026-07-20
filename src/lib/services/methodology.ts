@@ -1,7 +1,11 @@
 import { supabase } from "@/lib/supabase";
-import { notifyWebhook } from "@/lib/webhook";
 import type { Methodology } from "@/types/domain";
 import type { CreateMethodologyInput, ListMethodologiesQuery, UpdateMethodologyInput } from "@/lib/validators/methodology";
+
+/**
+ * Methodology service — all CRUD operations go directly to Supabase.
+ * No webhook involvement (methodology does not require embeddings).
+ */
 
 const TABLE = "methodology_rules";
 
@@ -36,33 +40,39 @@ export async function getMethodologyStats() {
 }
 
 export async function createMethodology(input: CreateMethodologyInput): Promise<Methodology> {
-  const result = await notifyWebhook("methodology", "create", {
-    title: input.title, explanation: input.explanation ?? null, keywords: input.keywords ?? null,
-    embedding_required: true,
-  });
-  if (!result.success) throw new Error(result.error);
-  return { id: "", title: input.title, explanation: input.explanation ?? null, keywords: input.keywords ?? null };
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({
+      title: input.title,
+      explanation: input.explanation ?? null,
+      keywords: input.keywords ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw error ?? new Error("Create failed");
+  return toDomain(data as Row);
 }
 
 export async function updateMethodology(id: string, input: UpdateMethodologyInput): Promise<Methodology | null> {
-  // Fetch the existing record to compare explanation (the content field)
-  const existing = await getMethodology(id);
-  const oldExplanation = existing?.explanation ?? "";
+  const update: Record<string, unknown> = {};
+  if (input.title !== undefined) update.title = input.title;
+  if (input.explanation !== undefined) update.explanation = input.explanation;
+  if (input.keywords !== undefined) update.keywords = input.keywords;
 
-  // embedding_required: true only when explanation actually changed
-  const newExplanation = input.explanation ?? "";
-  const embeddingRequired = input.explanation !== undefined && newExplanation !== oldExplanation;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
 
-  const result = await notifyWebhook("methodology", "update", {
-    id, title: input.title ?? null, explanation: input.explanation ?? null, keywords: input.keywords ?? null,
-    embedding_required: embeddingRequired,
-  });
-  if (!result.success) throw new Error(result.error);
-  return { id, title: input.title ?? "", explanation: input.explanation ?? null, keywords: input.keywords ?? null };
+  if (error || !data) return null;
+  return toDomain(data as Row);
 }
 
 export async function deleteMethodology(id: string): Promise<boolean> {
-  const result = await notifyWebhook("methodology", "delete", id);
-  if (!result.success) throw new Error(result.error);
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
   return true;
 }

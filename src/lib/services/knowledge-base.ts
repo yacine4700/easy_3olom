@@ -95,7 +95,9 @@ export async function updateKnowledgeDocument(id: string, input: UpdateKnowledge
 }
 
 export async function deleteKnowledgeDocument(id: string): Promise<boolean> {
-  const result = await notifyWebhook("knowledge", "delete", id);
-  if (!result.success) throw new Error(result.error);
+  // Direct Supabase delete — ON DELETE CASCADE on knowledge_chunks
+  // will automatically remove all associated chunks.
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
   return true;
 }

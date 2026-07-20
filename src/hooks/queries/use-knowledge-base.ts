@@ -95,7 +95,7 @@ export function useUpdateKnowledgeDocument() {
   });
 }
 
-/** Delete a document (writes through the webhook). */
+/** Delete a document (direct Supabase — ON DELETE CASCADE removes chunks). */
 export function useDeleteKnowledgeDocument() {
   const qc = useQueryClient();
   return useMutation({
@@ -103,7 +103,7 @@ export function useDeleteKnowledgeDocument() {
       fetchJson<void>(`/api/knowledge-base/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: knowledgeBaseKeys.lists() });
-      toast.success("تم الإرسال إلى Webhook");
+      toast.success("تم حذف المعرفة");
     },
     onError: (err: ApiError) => toast.error(err.message),
   });
