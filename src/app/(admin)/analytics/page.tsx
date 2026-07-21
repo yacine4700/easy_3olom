@@ -3,24 +3,37 @@ import {
   BookText,
   ChartNoAxesColumn,
   Library,
+  MessageCircleQuestion,
   Route,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { KpiCard, type KpiTone } from "@/components/analytics/kpi-card";
 import { ReadinessBarChart } from "@/components/analytics/readiness-bar-chart";
+import { RecentQuestionsFeed } from "@/components/analytics/recent-questions-feed";
+import { StatusDonutChart, type StatusSlice } from "@/components/analytics/status-donut-chart";
 import { getGlossaryStats } from "@/lib/services/glossary";
 import { getKnowledgeBaseStats } from "@/lib/services/knowledge-base";
 import { getMethodologyStats } from "@/lib/services/methodology";
+import {
+  getStudentQuestionsStats,
+  getRecentStudentQuestions,
+} from "@/lib/services/student-questions-table";
 
 export const metadata: Metadata = { title: "التحليلات" };
 
+const SKY_FILL = "var(--chart-2)";
+const BRAND_FILL = "var(--chart-1)";
+
 export default async function AnalyticsPage() {
-  const [kbRes, glossaryRes, methodologyRes] = await Promise.allSettled([
-    getKnowledgeBaseStats(),
-    getGlossaryStats(),
-    getMethodologyStats(),
-  ]);
+  const [kbRes, glossaryRes, methodologyRes, sqRes, recentRes] =
+    await Promise.allSettled([
+      getKnowledgeBaseStats(),
+      getGlossaryStats(),
+      getMethodologyStats(),
+      getStudentQuestionsStats(),
+      getRecentStudentQuestions(5),
+    ]);
 
   const kbStats =
     kbRes.status === "fulfilled" ? kbRes.value : { total: 0, domains: 0 };
@@ -32,6 +45,22 @@ export default async function AnalyticsPage() {
     methodologyRes.status === "fulfilled"
       ? methodologyRes.value
       : { total: 0 };
+  const sqStats =
+    sqRes.status === "fulfilled"
+      ? sqRes.value
+      : { total: 0, new: 0, answered: 0 };
+  const recent =
+    recentRes.status === "fulfilled" ? recentRes.value : [];
+
+  const statusData: StatusSlice[] = [
+    { status: "new", label: "جديد", count: sqStats.new, fill: SKY_FILL },
+    {
+      status: "answered",
+      label: "تمت الإجابة",
+      count: sqStats.answered,
+      fill: BRAND_FILL,
+    },
+  ];
 
   const readinessData = [
     { module: "قاعدة المعرفة", total: kbStats.total },
@@ -75,6 +104,15 @@ export default async function AnalyticsPage() {
       href: "/methodology",
       tone: "default",
     },
+    {
+      key: "questions",
+      title: "أسئلة الطلاب",
+      value: sqStats.total,
+      subtitle: `${sqStats.new} جديدة · ${sqStats.answered} مُجابة`,
+      icon: MessageCircleQuestion,
+      href: "/student-questions",
+      tone: "warn",
+    },
   ];
 
   return (
@@ -90,11 +128,11 @@ export default async function AnalyticsPage() {
           </Badge>
         </div>
         <p className="text-muted-foreground text-sm">
-          نظرة شاملة على قاعدة المعرفة والمعجم والقواعد المنهجية.
+          نظرة شاملة على قاعدة المعرفة وأسئلة الطلاب.
         </p>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {kpiCards.map((card) => (
           <KpiCard
             key={card.key}
@@ -108,7 +146,12 @@ export default async function AnalyticsPage() {
         ))}
       </section>
 
-      <ReadinessBarChart data={readinessData} />
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <StatusDonutChart data={statusData} />
+        <ReadinessBarChart data={readinessData} />
+      </section>
+
+      <RecentQuestionsFeed questions={recent} />
     </div>
   );
 }
