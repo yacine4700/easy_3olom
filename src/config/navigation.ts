@@ -1,4 +1,4 @@
-import { LayoutDashboard, Library, MessageCircleQuestion, Route, Target, BookText, ChartNoAxesColumn, Settings } from "lucide-react";
+import { LayoutDashboard, Library, MessageCircleQuestion, Route, BookText, ChartNoAxesColumn, Settings } from "lucide-react";
 import type { NavConfig } from "@/types/nav";
 
 export const navConfig: NavConfig = [
@@ -11,7 +11,6 @@ export const navConfig: NavConfig = [
   ]},
   { key: "pedagogy", label: "البيداغوجيا", items: [
     { key: "methodology", title: "قواعد المنهجية", href: "/methodology", icon: Route, description: "قواعد يتبعها الطالب في الاختبارات" },
-    { key: "learning-objectives", title: "أهداف التعلم", href: "/learning-objectives", icon: Target, description: "الكفاءات المستهدمة", badge: "قريباً", disabled: true },
   ]},
   { key: "engagement", label: "التفاعل", items: [
     { key: "student-questions", title: "أسئلة الطلاب", href: "/student-questions", icon: MessageCircleQuestion, description: "الأسئلة الواردة عبر تيليجرام" },

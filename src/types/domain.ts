@@ -34,13 +34,3 @@ export interface GlossaryTerm extends BaseEntity {
   unit: string | null;
   domain: string | null;
 }
-
-// user_questions table: id, session_id, user_id, question, answer, created_at
-export type QuestionStatus = "new" | "answered";
-
-export interface StudentQuestion extends BaseEntity {
-  question: string;
-  answer: string | null;
-  sessionId: string | null;
-  userId: string | null;
-}

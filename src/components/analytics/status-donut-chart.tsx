@@ -1,23 +1,16 @@
 "use client";
 
-import * as React from "react";
-import { Cell, Pie, PieChart } from "recharts";
+import { Pie, PieChart, Cell } from "recharts";
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  type ChartConfig,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
+  type ChartConfig,
 } from "@/components/ui/chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface StatusSlice {
   status: string;
@@ -26,48 +19,34 @@ export interface StatusSlice {
   fill: string;
 }
 
-export interface StatusDonutChartProps {
-  data: StatusSlice[];
-}
-
-/**
- * Donut chart showing the breakdown of student questions by answer status.
- *
- * Client Component — Recharts needs a measured container (ResponsiveContainer).
- * The `chartConfig` is keyed by status so the legend + tooltip can resolve
- * Arabic labels and the slice colors are wired through CSS variables declared
- * via ChartStyle.
- */
 const chartConfig = {
-  new: { label: "جديد", color: "#0ea5e9" },
-  answered: { label: "تمت الإجابة", color: "#10b981" },
+  new: { label: "جديد", color: "var(--chart-2)" },
+  answered: { label: "تمت الإجابة", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
-export function StatusDonutChart({ data }: StatusDonutChartProps) {
-  const total = React.useMemo(
-    () => data.reduce((sum, d) => sum + d.count, 0),
-    [data],
-  );
+export function StatusDonutChart({ data }: { data: StatusSlice[] }) {
+  const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader>
-        <CardTitle>الأسئلة حسب الحالة</CardTitle>
-        <CardDescription>توزيع الأسئلة الواردة من الطلاب</CardDescription>
+        <CardTitle className="text-sm font-medium">
+          الأسئلة حسب الحالة
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
-          <div className="text-muted-foreground flex h-[240px] items-center justify-center text-sm">
+          <p className="text-muted-foreground py-12 text-center text-sm">
             لا توجد أسئلة بعد
-          </div>
+          </p>
         ) : (
           <ChartContainer
             config={chartConfig}
-            className="aspect-auto mx-auto h-[240px] w-full"
+            className="mx-auto aspect-square max-h-[240px]"
           >
             <PieChart>
               <ChartTooltip
-                content={<ChartTooltipContent nameKey="status" hideLabel />}
+                content={<ChartTooltipContent nameKey="label" hideLabel />}
               />
               <Pie
                 data={data}
@@ -75,16 +54,16 @@ export function StatusDonutChart({ data }: StatusDonutChartProps) {
                 nameKey="status"
                 innerRadius={55}
                 outerRadius={85}
-                paddingAngle={3}
-                strokeWidth={2}
+                paddingAngle={2}
+                strokeWidth={0}
               >
                 {data.map((entry) => (
                   <Cell key={entry.status} fill={entry.fill} />
                 ))}
               </Pie>
               <ChartLegend
-                content={<ChartLegendContent nameKey="status" />}
-                verticalAlign="bottom"
+                content={<ChartLegendContent nameKey="label" />}
+                className="flex-wrap gap-3"
               />
             </PieChart>
           </ChartContainer>

@@ -90,3 +90,32 @@ export async function deleteStudentQuestionRecord(id: string): Promise<boolean> 
   if (error) throw error;
   return true;
 }
+
+export async function getStudentQuestionsStats(): Promise<{
+  total: number;
+  answered: number;
+  new: number;
+}> {
+  const [totalRes, answeredRes] = await Promise.all([
+    supabase.from(TABLE).select("*", { count: "exact", head: true }),
+    supabase
+      .from(TABLE)
+      .select("*", { count: "exact", head: true })
+      .not("answer", "is", null),
+  ]);
+  const total = totalRes.count ?? 0;
+  const answered = answeredRes.count ?? 0;
+  return { total, answered, new: total - answered };
+}
+
+export async function getRecentStudentQuestions(
+  limit = 5,
+): Promise<StudentQuestionRecord[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as Row[]).map(toDomain);
+}

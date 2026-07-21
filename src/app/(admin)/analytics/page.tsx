@@ -3,44 +3,24 @@ import {
   BookText,
   ChartNoAxesColumn,
   Library,
-  MessageCircleQuestion,
   Route,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { KpiCard, type KpiTone } from "@/components/analytics/kpi-card";
 import { ReadinessBarChart } from "@/components/analytics/readiness-bar-chart";
-import { RecentQuestionsFeed } from "@/components/analytics/recent-questions-feed";
-import { StatusDonutChart, type StatusSlice } from "@/components/analytics/status-donut-chart";
 import { getGlossaryStats } from "@/lib/services/glossary";
 import { getKnowledgeBaseStats } from "@/lib/services/knowledge-base";
 import { getMethodologyStats } from "@/lib/services/methodology";
-import {
-  getRecentUnansweredQuestions,
-  getStudentQuestionStats,
-} from "@/lib/services/student-question";
 
 export const metadata: Metadata = { title: "التحليلات" };
 
-const SKY_FILL = "var(--color-new)";
-const BRAND_FILL = "var(--color-answered)";
-
-/**
- * /analytics — high-level overview across every content module.
- *
- * Server Component: parallel-fetches five read endpoints via Promise.allSettled
- * so that a single failing service (e.g. a missing table on a fresh DB) doesn't
- * take the whole page down — each KPI / chart falls back to a zero value.
- */
 export default async function AnalyticsPage() {
-  const [kbRes, glossaryRes, methodologyRes, sqRes, recentRes] =
-    await Promise.allSettled([
-      getKnowledgeBaseStats(),
-      getGlossaryStats(),
-      getMethodologyStats(),
-      getStudentQuestionStats(),
-      getRecentUnansweredQuestions(5),
-    ]);
+  const [kbRes, glossaryRes, methodologyRes] = await Promise.allSettled([
+    getKnowledgeBaseStats(),
+    getGlossaryStats(),
+    getMethodologyStats(),
+  ]);
 
   const kbStats =
     kbRes.status === "fulfilled" ? kbRes.value : { total: 0, domains: 0 };
@@ -52,27 +32,11 @@ export default async function AnalyticsPage() {
     methodologyRes.status === "fulfilled"
       ? methodologyRes.value
       : { total: 0 };
-  const sqStats =
-    sqRes.status === "fulfilled"
-      ? sqRes.value
-      : { total: 0, new: 0, answered: 0 };
-  const recent =
-    recentRes.status === "fulfilled" ? recentRes.value : [];
-
-  const statusData: StatusSlice[] = [
-    { status: "new", label: "جديد", count: sqStats.new, fill: SKY_FILL },
-    {
-      status: "answered",
-      label: "تمت الإجابة",
-      count: sqStats.answered,
-      fill: BRAND_FILL,
-    },
-  ];
 
   const readinessData = [
     { module: "قاعدة المعرفة", total: kbStats.total },
     { module: "المعجم", total: glossaryStats.total },
-    { module: "القواعد المنهاجية", total: methodologyStats.total },
+    { module: "قواعد المنهجية", total: methodologyStats.total },
   ];
 
   const kpiCards: Array<{
@@ -104,21 +68,12 @@ export default async function AnalyticsPage() {
     },
     {
       key: "methodology",
-      title: "القواعد المنهاجية",
+      title: "قواعد المنهجية",
       value: methodologyStats.total,
-      subtitle: "قواعد التوجيه",
+      subtitle: "قواعد المنهجية",
       icon: Route,
       href: "/methodology",
       tone: "default",
-    },
-    {
-      key: "questions",
-      title: "أسئلة الطلاب",
-      value: sqStats.total,
-      subtitle: `${sqStats.new} جديدة · ${sqStats.answered} مُجابة`,
-      icon: MessageCircleQuestion,
-      href: "/student-questions",
-      tone: "warn",
     },
   ];
 
@@ -135,11 +90,11 @@ export default async function AnalyticsPage() {
           </Badge>
         </div>
         <p className="text-muted-foreground text-sm">
-          نظرة شاملة على نشاط قاعدة المعرفة وأسئلة الطلاب.
+          نظرة شاملة على قاعدة المعرفة والمعجم والقواعد المنهجية.
         </p>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {kpiCards.map((card) => (
           <KpiCard
             key={card.key}
@@ -153,12 +108,7 @@ export default async function AnalyticsPage() {
         ))}
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <StatusDonutChart data={statusData} />
-        <ReadinessBarChart data={readinessData} />
-      </section>
-
-      <RecentQuestionsFeed questions={recent} />
+      <ReadinessBarChart data={readinessData} />
     </div>
   );
 }
