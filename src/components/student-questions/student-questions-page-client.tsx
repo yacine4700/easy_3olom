@@ -3,7 +3,14 @@
 import { MessageCircleQuestion } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { StudentQuestionsView } from "@/components/student-questions/student-questions-view";
+import { StudentQuestionsTableView } from "@/components/student-questions/student-questions-table-view";
 
 export function StudentQuestionsPageClient() {
   return (
@@ -25,7 +32,18 @@ export function StudentQuestionsPageClient() {
         </p>
       </div>
 
-      <StudentQuestionsView />
+      <Tabs defaultValue="user_questions">
+        <TabsList>
+          <TabsTrigger value="user_questions">محادثات المساعد</TabsTrigger>
+          <TabsTrigger value="student_questions">أسئلة الاختبارات</TabsTrigger>
+        </TabsList>
+        <TabsContent value="user_questions" className="mt-4">
+          <StudentQuestionsView />
+        </TabsContent>
+        <TabsContent value="student_questions" className="mt-4">
+          <StudentQuestionsTableView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

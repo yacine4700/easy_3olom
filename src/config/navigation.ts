@@ -10,7 +10,7 @@ export const navConfig: NavConfig = [
     { key: "glossary", title: "المعجم", href: "/glossary", icon: BookText, description: "مصطلحات وتعريفات المجال" },
   ]},
   { key: "pedagogy", label: "البيداغوجيا", items: [
-    { key: "methodology", title: "القواعد المنهاجية", href: "/methodology", icon: Route, description: "قواعد توجيه المساعد" },
+    { key: "methodology", title: "قواعد المنهجية", href: "/methodology", icon: Route, description: "قواعد يتبعها الطالب في الاختبارات" },
     { key: "learning-objectives", title: "أهداف التعلم", href: "/learning-objectives", icon: Target, description: "الكفاءات المستهدمة", badge: "قريباً", disabled: true },
   ]},
   { key: "engagement", label: "التفاعل", items: [

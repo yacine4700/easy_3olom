@@ -13,11 +13,11 @@ export function MethodologyPageClient() {
             <Route className="size-4" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            القواعد المنهاجية
+            قواعد المنهجية
           </h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          القواعد التوجيهية لمساعد الذكاء الاصطناعي.
+          قواعد يتبعها الطالب أثناء إجابته في الاختبارات.
         </p>
       </div>
 
