@@ -21,9 +21,8 @@ import {
 import type { ExerciseCollection } from "@/types/exercises";
 
 const COLLECTION_TYPES = [
-  { value: "series", label: "Series" },
+  { value: "SERIES", label: "Series" },
   { value: "BAC", label: "BAC" },
-  { value: "EXAM", label: "EXAM" },
 ] as const;
 
 interface CollectionFormProps {
@@ -35,7 +34,9 @@ interface CollectionFormProps {
 
 const EMPTY: CreateExerciseCollectionInput = {
   title: "",
-  collectionType: "series",
+  collectionType: "SERIES",
+  year: null,
+  unit: null,
   pdfFileId: "",
 };
 
@@ -51,6 +52,8 @@ export function CollectionForm({
       ? {
           title: defaultValues.title ?? "",
           collectionType: (defaultValues.collectionType as CreateExerciseCollectionInput["collectionType"]) ?? "series",
+          year: defaultValues.year ?? null,
+          unit: defaultValues.unit ?? null,
           pdfFileId: defaultValues.pdfFileId ?? "",
         }
       : {}),
@@ -116,11 +119,34 @@ export function CollectionForm({
         )}
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="year">السنة (اختياري)</Label>
+          <Input
+            id="year"
+            type="number"
+            placeholder="مثال: 2024"
+            autoComplete="off"
+            {...register("year", { valueAsNumber: true })}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="unit">الوحدة (اختياري)</Label>
+          <Input
+            id="unit"
+            placeholder="مثال: الوحدة الأولى"
+            autoComplete="off"
+            {...register("unit")}
+          />
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="pdfFileId">معرف ملف PDF</Label>
         <Input
           id="pdfFileId"
-          placeholder="مثال: pdf_1234 (اختياري)"
+          placeholder="مثال: pdf_1234"
           autoComplete="off"
           {...register("pdfFileId")}
         />

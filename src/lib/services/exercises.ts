@@ -66,6 +66,8 @@ export async function createExerciseCollection(input: CreateExerciseCollectionIn
     .insert({
       title: input.title,
       collection_type: input.collectionType,
+      year: input.year ?? null,
+      unit: input.unit ?? null,
       pdf_file_id: input.pdfFileId ?? "",
     })
     .select().single();
@@ -77,6 +79,8 @@ export async function updateExerciseCollection(id: string, input: UpdateExercise
   const update: Record<string, unknown> = {};
   if (input.title !== undefined) update.title = input.title;
   if (input.collectionType !== undefined) update.collection_type = input.collectionType;
+  if (input.year !== undefined) update.year = input.year;
+  if (input.unit !== undefined) update.unit = input.unit;
   if (input.pdfFileId !== undefined) update.pdf_file_id = input.pdfFileId;
   const { data, error } = await supabase.from(COLLECTIONS_TABLE).update(update).eq("id", id).select().single();
   if (error || !data) return null;

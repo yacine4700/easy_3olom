@@ -3,9 +3,11 @@ import { z } from "zod";
 // Exercise Collections
 export const createExerciseCollectionSchema = z.object({
   title: z.string().min(2, "العنوان مطلوب").max(200),
-  collectionType: z.enum(["series", "BAC", "EXAM"], {
+  collectionType: z.enum(["SERIES", "BAC"], {
     errorMap: () => ({ message: "اختر النوع" }),
   }),
+  year: z.number().int().min(2000).max(2100).nullable().optional(),
+  unit: z.string().max(200).nullable().optional(),
   pdfFileId: z.string().max(500).default(""),
 });
 export const updateExerciseCollectionSchema = createExerciseCollectionSchema.partial();
