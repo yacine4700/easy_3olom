@@ -108,26 +108,6 @@ export function getCollectionColumns(
       size: 120,
     },
     {
-      accessorKey: "year",
-      header: "السنة",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {row.original.year ?? "—"}
-        </span>
-      ),
-      size: 90,
-    },
-    {
-      accessorKey: "unit",
-      header: "الوحدة",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {row.original.unit || "—"}
-        </span>
-      ),
-      size: 160,
-    },
-    {
       id: "actions",
       cell: ({ row }) => (
         <RowActionsCell collection={row.original} actions={actions} />

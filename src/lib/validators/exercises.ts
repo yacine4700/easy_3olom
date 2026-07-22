@@ -3,10 +3,10 @@ import { z } from "zod";
 // Exercise Collections
 export const createExerciseCollectionSchema = z.object({
   title: z.string().min(2, "العنوان مطلوب").max(200),
-  collectionType: z.string().max(100).nullable().default(null),
-  year: z.number().int().min(2000).max(2100).nullable().default(null),
-  unit: z.string().max(200).nullable().default(null),
-  pdfFileId: z.string().max(500).nullable().default(null),
+  collectionType: z.enum(["series", "BAC", "EXAM"], {
+    errorMap: () => ({ message: "اختر النوع" }),
+  }),
+  pdfFileId: z.string().max(500).default(""),
 });
 export const updateExerciseCollectionSchema = createExerciseCollectionSchema.partial();
 export const listExerciseCollectionsQuerySchema = z.object({
