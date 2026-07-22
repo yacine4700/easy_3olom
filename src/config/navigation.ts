@@ -1,4 +1,4 @@
-import { LayoutDashboard, Library, MessageCircleQuestion, Route, BookText, ChartNoAxesColumn, Settings } from "lucide-react";
+import { LayoutDashboard, Library, MessageCircleQuestion, Route, BookText, ChartNoAxesColumn, Settings, ClipboardList } from "lucide-react";
 import type { NavConfig } from "@/types/nav";
 
 export const navConfig: NavConfig = [
@@ -14,6 +14,7 @@ export const navConfig: NavConfig = [
   ]},
   { key: "engagement", label: "التفاعل", items: [
     { key: "student-questions", title: "أسئلة الطلاب", href: "/student-questions", icon: MessageCircleQuestion, description: "الأسئلة الواردة عبر تيليجرام" },
+    { key: "exercises", title: "التمارين", href: "/exercises", icon: ClipboardList, description: "إدارة السلاسل والتمارين" },
     { key: "analytics", title: "التحليلات", href: "/analytics", icon: ChartNoAxesColumn, description: "إحصائيات الاستخدام" },
   ]},
   { key: "system", label: "النظام", items: [

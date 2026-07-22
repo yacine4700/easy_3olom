@@ -422,3 +422,65 @@ Verification (Agent Browser):
 - Button says "إضافة معرفة" ✓
 - Settings page shows "تصنيف المعرفة" section with 3 level tabs ✓
 - No errors ✓
+
+---
+Task ID: EXERCISES
+Agent: sub (general-purpose)
+Task: Build Exercises module — API routes, TanStack Query hooks, and full UI for exercise_collections + exercises (with complex dynamic JSON form).
+
+Work Log:
+- Verified pre-existing layer: `src/lib/services/exercises.ts` (CRUD via Supabase), `src/lib/validators/exercises.ts` (Zod schemas), `src/types/exercises.ts` (ExerciseCollection / Exercise / ExerciseJson / ExercisePart / ExerciseQuestion).
+
+API routes (4 files):
+- `src/app/api/exercise-collections/route.ts` — GET (listExerciseCollections) + POST (createExerciseCollection). Validates query + body with Zod; returns `{ error }` + 400 on failure.
+- `src/app/api/exercise-collections/[id]/route.ts` — GET / PATCH / DELETE. Pattern mirrors methodology/[id].
+- `src/app/api/exercises/route.ts` — GET (listExercises) + POST (createExercise).
+- `src/app/api/exercises/[id]/route.ts` — GET / PATCH / DELETE.
+
+Hooks (`src/hooks/queries/use-exercises.ts`):
+- `exerciseCollectionKeys` + `exerciseKeys` colocated query keys.
+- `useExerciseCollections(query)`, `useCreateExerciseCollection`, `useUpdateExerciseCollection`, `useDeleteExerciseCollection`.
+- `useExercises(query)`, `useCreateExercise`, `useUpdateExercise`, `useDeleteExercise`.
+- All mutations invalidate list queries + toast success (Arabic: "تم إنشاء/تحديث/حذف السلسلة" and "تم إنشاء/تحديث/حذف التمرين"); errors surfaced via sonner.
+
+Exercise Collection UI (7 files in `src/components/exercises/`):
+- `collection-form.tsx` — RHF + Zod. Fields: title, collectionType, year (number, valueAsNumber), unit, pdfFileId. Empty strings → null on submit.
+- `collection-dialog.tsx` — sm:max-w-2xl, create/edit in one dialog.
+- `delete-collection-dialog.tsx` — AlertDialog confirmation, destructive styling.
+- `collection-columns.tsx` — TanStack columns: select / title / type (Badge) / year / unit / actions (تعديل/حذف dropdown).
+- `collections-table.tsx` — TanStack Table (sort, paginate, select, skeleton + empty state).
+- `collections-toolbar.tsx` — search + Clear + "سلسلة جديدة" brand button.
+- `collections-view.tsx` — client orchestrator (debounced search, dialogs).
+
+Exercise UI (7 files):
+- `exercise-form.tsx` — KEY COMPLEX COMPONENT. Three-level nested dynamic form:
+  - Section 1 "معلومات التمرين": collectionId (Select populated from useExerciseCollections), exerciseNumber (Select الأول/الثاني/الثالث), title, exerciseNature, concept, context (Textarea).
+  - Section 2 "أجزاء التمرين": useFieldArray on `parts`. Each part rendered inside a Collapsible card with auto-numbered badge (partIndex+1). Each part has: context Textarea, documents (useFieldArray of `{ value }` text inputs), questions (useFieldArray). Add/remove Part buttons (Plus/Trash2).
+  - Each question is a card with: id (Q1…), hint, question Textarea, answer Textarea, rubric (useFieldArray of `{ value }` text inputs, numbered). Add/remove Question + Add/remove Rubric buttons.
+  - Local form model `ExerciseFormValues` (with `{ value: string }[]` wrappers for primitive arrays) maps cleanly to `ExerciseJson` via `buildExerciseJson()`. Empty strings filtered out; part number auto-assigned as index+1.
+  - On edit: `valuesFromExercise()` parses existing `exerciseJson` into the form model (defaults to one empty part if missing).
+  - Skipped zodResolver (server schema uses `z.any()` for exerciseJson); lightweight title-length check on submit via setError.
+- `exercise-dialog.tsx` — sm:max-w-3xl (per spec).
+- `delete-exercise-dialog.tsx` — AlertDialog.
+- `exercise-columns.tsx` — columns: select / title (+concept preview) / exerciseNumber (Badge) / collection (lookup via collectionsById map) / actions.
+- `exercises-table.tsx` — TanStack Table; receives `collectionsById` map prop to resolve the collection column.
+- `exercises-toolbar.tsx` — search + collection filter Select + Clear + "تمرين جديد" brand button.
+- `exercises-view.tsx` — orchestrator. Loads exercises + collections in parallel; builds `collectionsById` Map; passes to table + toolbar.
+
+Page + page client:
+- `src/app/(admin)/exercises/page.tsx` — Server Component, metadata "التمارين", renders `<ExercisesPageClient/>`.
+- `src/components/exercises/exercises-page-client.tsx` — Client. h1 "التمارين" with ClipboardList icon, description "إدارة السلاسل والتمارين". Tabs (default "collections"): "السلاسل" + "التمارين". Each TabsContent mounts its view.
+
+Navigation:
+- Added `ClipboardList` import to `src/config/navigation.ts`; inserted exercises item into the "engagement" group (between student-questions and analytics): `{ key: "exercises", title: "التمارين", href: "/exercises", icon: ClipboardList, description: "إدارة السلاسل والتمارين" }`.
+
+Cross-cutting:
+- All UI text Arabic; RTL inherited from `<html dir="rtl">`; logical CSS properties used (`ps-8`, `start-2.5`, `text-start`, `text-end`, `me-*` etc.) so no per-element dir needed.
+- Reused shadcn primitives (Button, Input, Label, Textarea, Select, Badge, Checkbox, DropdownMenu, AlertDialog, Dialog, Tabs, Collapsible, Table, Skeleton) — no new UI primitives added.
+- Mirrors the existing methodology/glossary vertical-slice pattern (service → API → hook → form → dialog → columns → table → toolbar → view → page).
+- Did NOT run lint or dev server per instructions.
+
+Stage Summary:
+- Exercises module complete: 4 API routes + 1 hooks file + 14 UI components + 1 page + 1 page client + navigation update.
+- The complex dynamic `exerciseJson` form is fully functional: parts ↔ documents ↔ questions ↔ rubric all add/remove; JSON rebuilt on submit; pre-populated on edit.
+- All text Arabic; RTL via logical properties; existing patterns preserved.
