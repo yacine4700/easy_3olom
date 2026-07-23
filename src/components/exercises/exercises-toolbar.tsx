@@ -16,6 +16,8 @@ import type { ExerciseCollection } from "@/types/exercises";
 export interface ExercisesTableFilters {
   search: string;
   collectionId: string; // "" = all collections
+  difficulty: string; // "" = all difficulties (EASY/MEDIUM/HARD)
+  isBacBased: string; // "" = all, "true" / "false"
 }
 
 interface ExercisesToolbarProps {
@@ -37,14 +39,23 @@ export function ExercisesToolbar({
   onNew,
   collections,
 }: ExercisesToolbarProps) {
-  const hasActiveFilters = filters.search !== "" || filters.collectionId !== "";
+  const hasActiveFilters =
+    filters.search !== "" ||
+    filters.collectionId !== "" ||
+    filters.difficulty !== "" ||
+    filters.isBacBased !== "";
 
   function update(patch: Partial<ExercisesTableFilters>) {
     onFiltersChange((prev) => ({ ...prev, ...patch }));
   }
 
   function reset() {
-    onFiltersChange({ search: "", collectionId: "" });
+    onFiltersChange({
+      search: "",
+      collectionId: "",
+      difficulty: "",
+      isBacBased: "",
+    });
   }
 
   return (
@@ -77,6 +88,45 @@ export function ExercisesToolbar({
                 {c.title}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filters.difficulty || "all"}
+          onValueChange={(v) =>
+            update({ difficulty: v === "all" ? "" : v })
+          }
+        >
+          <SelectTrigger
+            className="h-9 w-full sm:w-[150px]"
+            aria-label="فلتر الصعوبة"
+          >
+            <SelectValue placeholder="كل الصعوبات" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">الكل</SelectItem>
+            <SelectItem value="EASY">سهل</SelectItem>
+            <SelectItem value="MEDIUM">متوسط</SelectItem>
+            <SelectItem value="HARD">صعب</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filters.isBacBased || "all"}
+          onValueChange={(v) =>
+            update({ isBacBased: v === "all" ? "" : v })
+          }
+        >
+          <SelectTrigger
+            className="h-9 w-full sm:w-[180px]"
+            aria-label="فلتر البكالوريا"
+          >
+            <SelectValue placeholder="البكالوريا" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">الكل</SelectItem>
+            <SelectItem value="true">مقتبس من البكالوريا</SelectItem>
+            <SelectItem value="false">غير مقتبس</SelectItem>
           </SelectContent>
         </Select>
 

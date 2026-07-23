@@ -104,6 +104,8 @@ type ExerciseRow = {
   collection_id: number | string | null;
   exercise_number: number | null;
   main_concept: string | null;
+  difficulty: string | null;
+  is_bac_based: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -116,6 +118,8 @@ function exerciseToDomain(r: ExerciseRow): Exercise {
     collectionId: r.collection_id != null ? String(r.collection_id) : null,
     exerciseNumber: r.exercise_number,
     mainConcept: r.main_concept,
+    difficulty: r.difficulty,
+    isBacBased: r.is_bac_based,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -129,9 +133,12 @@ export interface ExerciseListResult {
 }
 
 export async function listExercises(query: ListExercisesQuery): Promise<ExerciseListResult> {
-  const { search, collectionId, page, pageSize } = query;
+  const { search, collectionId, difficulty, isBacBased, page, pageSize } = query;
   let req = supabase.from(EXERCISES_TABLE).select("*", { count: "exact" });
   if (collectionId) req = req.eq("collection_id", collectionId);
+  if (difficulty) req = req.eq("difficulty", difficulty);
+  if (isBacBased === "true") req = req.eq("is_bac_based", true);
+  else if (isBacBased === "false") req = req.eq("is_bac_based", false);
   if (search) req = req.ilike("main_concept", `%${search}%`);
   req = req.order("created_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
   const { data, error, count } = await req;
@@ -154,6 +161,8 @@ export async function createExercise(input: CreateExerciseInput): Promise<Exerci
       collection_id: input.collectionId ? Number(input.collectionId) : null,
       exercise_number: input.exerciseNumber ?? null,
       main_concept: input.mainConcept ?? null,
+      difficulty: input.difficulty,
+      is_bac_based: input.isBacBased ?? false,
     })
     .select().single();
   if (error || !data) throw error ?? new Error("Create failed");
@@ -167,6 +176,8 @@ export async function updateExercise(id: string, input: UpdateExerciseInput): Pr
   if (input.collectionId !== undefined) update.collection_id = input.collectionId ? Number(input.collectionId) : null;
   if (input.exerciseNumber !== undefined) update.exercise_number = input.exerciseNumber;
   if (input.mainConcept !== undefined) update.main_concept = input.mainConcept;
+  if (input.difficulty !== undefined) update.difficulty = input.difficulty;
+  if (input.isBacBased !== undefined) update.is_bac_based = input.isBacBased;
   const { data, error } = await supabase.from(EXERCISES_TABLE).update(update).eq("id", id).select().single();
   if (error || !data) return null;
   return exerciseToDomain(data as ExerciseRow);

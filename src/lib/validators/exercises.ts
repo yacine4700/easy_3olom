@@ -25,12 +25,18 @@ export const createExerciseSchema = z.object({
   collectionId: z.string().nullable().default(null),
   exerciseNumber: z.number().int().min(1).max(99).nullable().default(null),
   mainConcept: z.string().max(500).nullable().default(null),
+  difficulty: z.enum(["EASY", "MEDIUM", "HARD"], {
+    errorMap: () => ({ message: "اختر الصعوبة" }),
+  }),
+  isBacBased: z.boolean().default(false),
   exerciseJson: z.any().default({ context: "", parts: [] }),
 });
 export const updateExerciseSchema = createExerciseSchema.partial();
 export const listExercisesQuerySchema = z.object({
   search: z.string().trim().optional(),
   collectionId: z.string().optional(),
+  difficulty: z.string().optional(),
+  isBacBased: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

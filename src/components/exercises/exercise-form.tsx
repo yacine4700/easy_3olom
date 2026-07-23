@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -62,7 +63,9 @@ interface PartFormValue {
 interface ExerciseFormValues {
   collectionId: string; // "" = none; converted to null on submit
   exerciseNumber: number | null; // null = unset
-  exerciseMode: string; // "" | "استرجاع" | "استدلال علمي" | "مسعى علمي"
+  exerciseMode: string; // "" | "RETRIEVAL" | "REASONING" | "SCIENTIFIC_APPROACH"
+  difficulty: string; // "" | "EASY" | "MEDIUM" | "HARD"
+  isBacBased: boolean;
   mainConcept: string;
   context: string;
   parts: PartFormValue[];
@@ -81,6 +84,12 @@ const EXERCISE_MODES = [
   { value: "SCIENTIFIC_APPROACH", label: "مسعى علمي" },
 ] as const;
 
+const EXERCISE_DIFFICULTIES = [
+  { value: "EASY", label: "سهل" },
+  { value: "MEDIUM", label: "متوسط" },
+  { value: "HARD", label: "صعب" },
+] as const;
+
 function emptyQuestion(): QuestionFormValue {
   return { id: "", question: "", answer: "", hint: "", rubric: [] };
 }
@@ -95,6 +104,8 @@ function valuesFromExercise(exercise?: Partial<Exercise>): ExerciseFormValues {
     collectionId: exercise?.collectionId ?? "",
     exerciseNumber: exercise?.exerciseNumber ?? null,
     exerciseMode: exercise?.exerciseMode ?? "",
+    difficulty: exercise?.difficulty ?? "",
+    isBacBased: exercise?.isBacBased ?? false,
     mainConcept: exercise?.mainConcept ?? "",
     context: json?.context ?? "",
     parts:
@@ -178,6 +189,8 @@ export function ExerciseForm({
   // Collection Select (string → null on submit).
   const collectionIdValue = watch("collectionId") ?? "";
   const exerciseModeValue = watch("exerciseMode") ?? "";
+  const difficultyValue = watch("difficulty") ?? "";
+  const isBacBasedValue = watch("isBacBased") ?? false;
 
   function handleFormSubmit(values: ExerciseFormValues) {
     if (!values.exerciseMode) {
@@ -187,10 +200,19 @@ export function ExerciseForm({
       });
       return;
     }
+    if (!values.difficulty) {
+      setError("difficulty", {
+        type: "manual",
+        message: "اختر الصعوبة",
+      });
+      return;
+    }
     const input: CreateExerciseInput = {
       collectionId: values.collectionId ? values.collectionId : null,
       exerciseNumber: values.exerciseNumber ?? null,
       exerciseMode: values.exerciseMode as CreateExerciseInput["exerciseMode"],
+      difficulty: values.difficulty as CreateExerciseInput["difficulty"],
+      isBacBased: values.isBacBased,
       mainConcept: values.mainConcept ? values.mainConcept : null,
       exerciseJson: buildExerciseJson(values),
     };
@@ -306,6 +328,56 @@ export function ExerciseForm({
               autoComplete="off"
               {...register("mainConcept")}
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="difficulty">الصعوبة</Label>
+            <Select
+              value={difficultyValue || "none"}
+              onValueChange={(v) =>
+                setValue("difficulty", v === "none" ? "" : v, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger id="difficulty" className="w-full">
+                <SelectValue placeholder="اختر الصعوبة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— غير محدد —</SelectItem>
+                {EXERCISE_DIFFICULTIES.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.difficulty && (
+              <p className="text-destructive text-xs">
+                {errors.difficulty.message as string}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="isBacBased">مقتبس من البكالوريا</Label>
+            <div className="flex h-9 items-center gap-2">
+              <Switch
+                id="isBacBased"
+                checked={isBacBasedValue}
+                onCheckedChange={(checked) =>
+                  setValue("isBacBased", checked, {
+                    shouldDirty: true,
+                  })
+                }
+              />
+              <span className="text-muted-foreground text-sm">
+                {isBacBasedValue ? "نعم" : "لا"}
+              </span>
+            </div>
           </div>
         </div>
 

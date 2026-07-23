@@ -37,6 +37,8 @@ export interface Exercise {
   collectionId: string | null;
   exerciseNumber: number | null;
   mainConcept: string | null;
+  difficulty: string | null;
+  isBacBased: boolean | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
