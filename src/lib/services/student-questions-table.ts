@@ -57,11 +57,29 @@ export interface StudentQuestionsListResult {
   pageSize: number;
 }
 
+export interface ListStudentQuestionsParams {
+  search?: string;
+  questionType?: string;
+  topic?: string;
+  studentIntent?: string;
+  sort?: "newest" | "oldest";
+  page?: number;
+  pageSize?: number;
+}
+
 export async function listStudentQuestionsRecords(
-  search?: string,
-  page = 1,
-  pageSize = 20,
+  params: ListStudentQuestionsParams = {},
 ): Promise<StudentQuestionsListResult> {
+  const {
+    search,
+    questionType,
+    topic,
+    studentIntent,
+    sort = "newest",
+    page = 1,
+    pageSize = 20,
+  } = params;
+
   let req = supabase.from(TABLE).select("*", { count: "exact" });
 
   if (search) {
@@ -69,9 +87,12 @@ export async function listStudentQuestionsRecords(
       `question.ilike.%${search}%,answer.ilike.%${search}%,topic.ilike.%${search}%`,
     );
   }
+  if (questionType) req = req.eq("question_type", questionType);
+  if (topic) req = req.eq("topic", topic);
+  if (studentIntent) req = req.eq("student_intent", studentIntent);
 
   req = req
-    .order("created_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: sort === "oldest", nullsFirst: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
 
   const { data, error, count } = await req;

@@ -4,18 +4,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { fetchJson, ApiError } from "@/lib/fetch";
-import type { StudentQuestionsListResult } from "@/lib/services/student-questions-table";
+import type {
+  StudentQuestionsListResult,
+  ListStudentQuestionsParams,
+} from "@/lib/services/student-questions-table";
 
-export function useStudentQuestionsTable(search: string, page: number, pageSize: number) {
+export function useStudentQuestionsTable(params: ListStudentQuestionsParams) {
   return useQuery({
-    queryKey: ["student-questions-table", search, page, pageSize],
+    queryKey: ["student-questions-table", params],
     queryFn: () => {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      params.set("page", String(page));
-      params.set("pageSize", String(pageSize));
+      const p = new URLSearchParams();
+      if (params.search) p.set("search", params.search);
+      if (params.questionType) p.set("questionType", params.questionType);
+      if (params.topic) p.set("topic", params.topic);
+      if (params.studentIntent) p.set("studentIntent", params.studentIntent);
+      if (params.sort) p.set("sort", params.sort);
+      p.set("page", String(params.page ?? 1));
+      p.set("pageSize", String(params.pageSize ?? 20));
       return fetchJson<StudentQuestionsListResult>(
-        `/api/student-questions-table?${params.toString()}`,
+        `/api/student-questions-table?${p.toString()}`,
       );
     },
     placeholderData: (prev) => prev,
