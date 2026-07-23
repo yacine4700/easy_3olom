@@ -61,10 +61,9 @@ interface PartFormValue {
 
 interface ExerciseFormValues {
   collectionId: string; // "" = none; converted to null on submit
-  title: string;
-  exerciseNumber: string; // "" | "1" | "2" | "3"; converted to number|null
-  exerciseNature: string;
-  concept: string;
+  exerciseNumber: number | null; // null = unset
+  exerciseMode: string; // "" | "استرجاع" | "استدلال علمي" | "مسعى علمي"
+  mainConcept: string;
   context: string;
   parts: PartFormValue[];
 }
@@ -76,11 +75,11 @@ interface ExerciseFormProps {
   isSubmitting?: boolean;
 }
 
-const EXERCISE_NUMBER_LABELS: Record<string, string> = {
-  "1": "الأول",
-  "2": "الثاني",
-  "3": "الثالث",
-};
+const EXERCISE_MODES = [
+  { value: "RETRIEVAL", label: "استرجاع" },
+  { value: "REASONING", label: "استدلال علمي" },
+  { value: "SCIENTIFIC_APPROACH", label: "مسعى علمي" },
+] as const;
 
 function emptyQuestion(): QuestionFormValue {
   return { id: "", question: "", answer: "", hint: "", rubric: [] };
@@ -94,13 +93,9 @@ function valuesFromExercise(exercise?: Partial<Exercise>): ExerciseFormValues {
   const json: ExerciseJson | null = exercise?.exerciseJson ?? null;
   return {
     collectionId: exercise?.collectionId ?? "",
-    title: exercise?.title ?? "",
-    exerciseNumber:
-      exercise?.exerciseNumber != null
-        ? String(exercise.exerciseNumber)
-        : "",
-    exerciseNature: exercise?.exerciseNature ?? "",
-    concept: exercise?.concept ?? "",
+    exerciseNumber: exercise?.exerciseNumber ?? null,
+    exerciseMode: exercise?.exerciseMode ?? "",
+    mainConcept: exercise?.mainConcept ?? "",
     context: json?.context ?? "",
     parts:
       json?.parts?.map((p) => ({
@@ -142,6 +137,9 @@ function buildExerciseJson(values: ExerciseFormValues): ExerciseJson {
  *
  * The page-level <html dir="rtl"> handles directionality; we use logical CSS
  * properties everywhere.
+ *
+ * Note: the `title` field was removed from the DB; an exercise is now
+ * identified by (collection, exerciseNumber) and described by `mainConcept`.
  */
 export function ExerciseForm({
   defaultValues,
@@ -170,8 +168,8 @@ export function ExerciseForm({
   } = useForm<ExerciseFormValues>({
     defaultValues: initial,
     // The stored exerciseJson is `z.any()` on the server, so we don't use a
-    // Zod resolver here. We run a lightweight title check on submit and let
-    // the server schema do the authoritative validation.
+    // Zod resolver here. We run a lightweight exerciseMode check on submit
+    // and let the server schema do the authoritative validation.
     shouldUnregister: false,
   });
 
@@ -179,32 +177,29 @@ export function ExerciseForm({
 
   // Collection Select (string → null on submit).
   const collectionIdValue = watch("collectionId") ?? "";
-  const exerciseNumberValue = watch("exerciseNumber") ?? "";
+  const exerciseModeValue = watch("exerciseMode") ?? "";
 
   function handleFormSubmit(values: ExerciseFormValues) {
-    if (!values.title || values.title.trim().length < 2) {
-      setError("title", {
+    if (!values.exerciseMode) {
+      setError("exerciseMode", {
         type: "manual",
-        message: "العنوان مطلوب",
+        message: "اختر طبيعة التمرين",
       });
       return;
     }
     const input: CreateExerciseInput = {
-      title: values.title,
       collectionId: values.collectionId ? values.collectionId : null,
-      exerciseNumber: values.exerciseNumber
-        ? Number(values.exerciseNumber)
-        : null,
-      exerciseNature: values.exerciseNature ? values.exerciseNature : null,
-      concept: values.concept ? values.concept : null,
+      exerciseNumber: values.exerciseNumber ?? null,
+      exerciseMode: values.exerciseMode as CreateExerciseInput["exerciseMode"],
+      mainConcept: values.mainConcept ? values.mainConcept : null,
       exerciseJson: buildExerciseJson(values),
     };
     onSubmit(input);
   }
 
   function handleError(errors: FieldErrors<ExerciseFormValues>) {
-    // Surface the first error as a toast-like inline message is already shown
-    // next to each field; nothing else to do here. Logged for debugging.
+    // Inline messages are already shown next to each field; nothing else to
+    // do here. Logged for debugging.
     console.warn("[exercise-form] validation errors", errors);
   }
 
@@ -253,61 +248,63 @@ export function ExerciseForm({
 
           <div className="space-y-2">
             <Label htmlFor="exerciseNumber">رقم التمرين</Label>
-            <Select
-              value={exerciseNumberValue || "none"}
-              onValueChange={(v) =>
-                setValue("exerciseNumber", v === "none" ? "" : v, {
-                  shouldDirty: true,
-                })
-              }
-            >
-              <SelectTrigger id="exerciseNumber" className="w-full">
-                <SelectValue placeholder="اختر الرقم" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— غير محدد —</SelectItem>
-                {Object.entries(EXERCISE_NUMBER_LABELS).map(([val, label]) => (
-                  <SelectItem key={val} value={val}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              id="exerciseNumber"
+              type="number"
+              min={1}
+              max={99}
+              placeholder="مثال: 1"
+              autoComplete="off"
+              {...register("exerciseNumber", {
+                setValueAs: (v) =>
+                  v === "" || v == null ? null : Number(v),
+              })}
+            />
+            {errors.exerciseNumber && (
+              <p className="text-destructive text-xs">
+                {errors.exerciseNumber.message as string}
+              </p>
+            )}
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="title">عنوان التمرين</Label>
-          <Input
-            id="title"
-            placeholder="مثال: تمرين على التركيب الضوئي"
-            autoComplete="off"
-            {...register("title")}
-          />
-          {errors.title && (
-            <p className="text-destructive text-xs">
-              {errors.title.message as string}
-            </p>
-          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="exerciseNature">طبيعة التمرين</Label>
-            <Input
-              id="exerciseNature"
-              placeholder="مثال: تطبيقي"
-              autoComplete="off"
-              {...register("exerciseNature")}
-            />
+            <Label htmlFor="exerciseMode">طبيعة التمرين</Label>
+            <Select
+              value={exerciseModeValue || "none"}
+              onValueChange={(v) =>
+                setValue("exerciseMode", v === "none" ? "" : v, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger id="exerciseMode" className="w-full">
+                <SelectValue placeholder="اختر الطبيعة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— غير محدد —</SelectItem>
+                {EXERCISE_MODES.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.exerciseMode && (
+              <p className="text-destructive text-xs">
+                {errors.exerciseMode.message as string}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="concept">الفكرة الرئيسية</Label>
+            <Label htmlFor="mainConcept">فكرة التمرين</Label>
             <Input
-              id="concept"
+              id="mainConcept"
               placeholder="مثال: تحويل الطاقة الضوئية"
               autoComplete="off"
-              {...register("concept")}
+              {...register("mainConcept")}
             />
           </div>
         </div>

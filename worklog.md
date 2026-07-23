@@ -484,3 +484,69 @@ Stage Summary:
 - Exercises module complete: 4 API routes + 1 hooks file + 14 UI components + 1 page + 1 page client + navigation update.
 - The complex dynamic `exerciseJson` form is fully functional: parts ↔ documents ↔ questions ↔ rubric all add/remove; JSON rebuilt on submit; pre-populated on edit.
 - All text Arabic; RTL via logical properties; existing patterns preserved.
+
+---
+Task ID: EXERCISES-FIX
+Agent: sub (general-purpose)
+Task: Rewrite Exercises module UI components to align with the updated DB schema (title removed, exerciseNature→exerciseMode, concept→mainConcept, exerciseNumber now a number input, collectionType gains EXAM with conditional year/unit) and fix RTL table rendering.
+
+Work Log:
+- Read the already-updated data layer to confirm the new contract:
+  - `src/types/exercises.ts`: `Exercise` has no `title`; uses `exerciseMode`, `mainConcept`, `exerciseNumber` (number|null), `collectionId`, `exerciseJson`. `ExerciseCollection` keeps `title` + `collectionType`, `year`, `unit`, `pdfFileId`.
+  - `src/lib/validators/exercises.ts`: `createExerciseSchema` — `exerciseMode` enum (استرجاع/استدلال علمي/مسعى علمي), `exerciseNumber` number 1–99 nullable, `mainConcept` string≤500 nullable, `exerciseJson` z.any(). `createExerciseCollectionSchema` — `collectionType` enum SERIES/BAC/EXAM, `year` number nullable, `unit` string nullable.
+  - `src/lib/services/exercises.ts`: maps DB columns `exercise_mode`, `main_concept`, `exercise_number`, `collection_id`, `exercise_json` ↔ domain fields.
+
+RTL root-cause fix (shared primitive):
+- `src/components/ui/table.tsx`: `TableHead` className `text-left` → `text-start`; `TableCell` gained `text-start`; checkbox padding `pr-0` → `pe-0` (logical) on both. This was the actual cause of the "tables are LTR" report — `<html dir="rtl">` cascades directionality but explicit `text-align:left` overrides it; `text-start` respects the inherited `dir`. Benefits ALL tables in the app (exercises, methodology, glossary, knowledge-base, student-questions), not just exercises.
+
+`src/components/exercises/collection-form.tsx` (rewritten):
+- `COLLECTION_TYPES` now: SERIES=سلسلة, BAC=بكالوريا, EXAM=امتحان.
+- `watch("collectionType")` drives conditional rendering: BAC/EXAM → show year (number input, optional), hide unit; SERIES → show unit (text, optional), hide year.
+- `handleTypeChange` clears the now-irrelevant field on switch (year nulled when going to SERIES; unit nulled when going to BAC/EXAM) so stale values aren't persisted.
+- year input uses `setValueAs: (v) => v === "" || v == null ? null : Number(v)` (avoids NaN from `valueAsNumber` on empty input, sends null cleanly).
+- Kept zodResolver; fields: title (required), collectionType, conditional year/unit, pdfFileId.
+
+`src/components/exercises/exercise-form.tsx` (rewritten):
+- Removed `title` field entirely (DB column gone).
+- `exerciseNumber`: changed from Select (الأول/الثاني/الثالث) → `<Input type="number" min=1 max=99>`; form value is `number | null` via `setValueAs` (null when empty).
+- `exerciseNature` → `exerciseMode`: now a Select with the three enum values (استرجاع / استدلال علمي / مسعى علمي) as both value and label (matches `z.enum`).
+- `concept` → `mainConcept`: text input, label "فكرة التمرين".
+- context Textarea + dynamic parts (PartCard → documents + questions → rubric) structure unchanged; `buildExerciseJson()` and `valuesFromExercise()` updated to read/write the new top-level fields.
+- `ExerciseFormValues` local type: `collectionId: string`, `exerciseNumber: number|null`, `exerciseMode: string`, `mainConcept: string`, `context: string`, `parts: PartFormValue[]`.
+- Submit handler: lightweight `exerciseMode` presence check via `setError` (replaces the old title check); builds `CreateExerciseInput` with `exerciseMode` cast to the enum union after validation. Skipped zodResolver (server schema uses `z.any()` for exerciseJson).
+- `useExerciseCollections` still populates the collection Select.
+
+`src/components/exercises/exercise-columns.tsx` (rewritten):
+- Removed the `title` column (and its concept preview sub-line).
+- Removed `EXERCISE_NUMBER_LABELS` map (number is now arbitrary).
+- New column order: select / exerciseNumber (#N badge) / exerciseMode (outline Badge) / mainConcept (line-clamp text) / collection (lookup via `collectionsById`) / actions.
+- All cells inherit `text-start` from the fixed `TableCell` primitive; row actions keep `text-end` (logical).
+
+`src/components/exercises/collection-columns.tsx` (updated):
+- Added `COLLECTION_TYPE_LABELS` map (SERIES→سلسلة, BAC→بكالوريا, EXAM→امتحان) so the type column shows Arabic labels.
+- Added explicit `text-start` to title/year/unit cell spans for clarity; actions cell keeps `text-end`.
+
+`src/components/exercises/exercises-table.tsx` + `collections-table.tsx`:
+- Added `dir="rtl"` to the bordered table container `<div>` (explicit intent, defense-in-depth alongside the html-level dir and the primitive fix).
+- Added `text-start` to `TableHead` className + header content wrapper for both tables.
+
+`src/components/exercises/exercise-dialog.tsx`:
+- Reviewed — no changes needed. The dialog has no `exercise.title` reference (its title/description are static Arabic strings); it passes the whole `exercise` to `ExerciseForm`, which now consumes `exerciseMode`/`mainConcept`/`exerciseNumber` from the updated defaultValues. Automatically correct.
+
+`src/components/exercises/delete-exercise-dialog.tsx` (updated):
+- Replaced `exercise?.title` with a `label` computed from `exercise?.mainConcept?.trim()` falling back to `التمرين رقم {exerciseNumber}` falling back to `هذا التمرين`.
+- Description reworded to "سيتم حذف {label} بشكل دائم…" (was "سيتم حذف التمرين {title}").
+
+`src/hooks/queries/use-exercises.ts`:
+- Verified clean — already uses the new types (`CreateExerciseInput`, `UpdateExerciseInput`, etc.) imported from the updated validators, so it aligns with the schema automatically. No `title`/`exerciseNature`/`concept` references. No changes.
+
+Verification (grep):
+- No remaining `exercise?.title`, `exercise.title`, `.exerciseNature`, or `.concept` references in `src/` (only legitimate `main_concept`/`mainConcept` in service + new components).
+- No `text-left` or `text-right` in `src/components/exercises/`.
+- Did NOT run lint or dev server per instructions.
+
+Stage Summary:
+- All 9 listed files reviewed/updated; the shared `table.tsx` primitive also fixed (root cause of the RTL bug, benefits every table in the app).
+- Schema alignment complete: title gone, exerciseMode/mainConcept/exerciseNumber(number) everywhere; collectionType gains EXAM with conditional year/unit via `watch`.
+- RTL: `text-left`→`text-start` in the shared primitive is the real fix; `dir="rtl"` + `text-start` added to exercise table containers as belt-and-suspenders.
+- Dynamic parts/questions/documents/rubric structure preserved unchanged — only top-level exercise fields changed.

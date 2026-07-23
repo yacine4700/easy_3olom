@@ -90,7 +90,7 @@ export function CollectionsTable({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border">
+      <div dir="rtl" className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -103,13 +103,13 @@ export function CollectionsTable({
                       key={header.id}
                       style={{ width: header.getSize() }}
                       className={cn(
-                        "h-10",
+                        "h-10 text-start",
                         canSort && "cursor-pointer select-none",
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       {header.isPlaceholder ? null : (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 text-start">
                           {flexRender(
                             header.column.columnDef.header,
                             header.getContext(),

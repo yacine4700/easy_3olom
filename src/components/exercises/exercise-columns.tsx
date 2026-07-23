@@ -15,12 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Exercise } from "@/types/exercises";
 
-const EXERCISE_NUMBER_LABELS: Record<number, string> = {
-  1: "الأول",
-  2: "الثاني",
-  3: "الثالث",
-};
-
 export interface ExerciseRowActions {
   onEdit: (exercise: Exercise) => void;
   onDelete: (exercise: Exercise) => void;
@@ -100,20 +94,6 @@ export function getExerciseColumns(
       size: 36,
     },
     {
-      accessorKey: "title",
-      header: "عنوان التمرين",
-      cell: ({ row }) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{row.original.title}</span>
-          {row.original.concept ? (
-            <span className="text-muted-foreground line-clamp-1 max-w-[42ch] text-xs">
-              {row.original.concept}
-            </span>
-          ) : null}
-        </div>
-      ),
-    },
-    {
       id: "exerciseNumber",
       header: "الرقم",
       cell: ({ row }) => {
@@ -123,11 +103,50 @@ export function getExerciseColumns(
         }
         return (
           <Badge variant="secondary" className="text-xs">
-            {EXERCISE_NUMBER_LABELS[num] ?? `#${num}`}
+            #{num}
           </Badge>
         );
       },
-      size: 100,
+      size: 90,
+      enableSorting: false,
+    },
+    {
+      accessorKey: "exerciseMode",
+      header: "الطبيعة",
+      cell: ({ row }) => {
+        const mode = row.original.exerciseMode;
+        if (!mode) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const labels: Record<string, string> = {
+          RETRIEVAL: "استرجاع",
+          REASONING: "استدلال علمي",
+          SCIENTIFIC_APPROACH: "مسعى علمي",
+        };
+        return (
+          <Badge variant="outline" className="text-xs">
+            {labels[mode] ?? mode}
+          </Badge>
+        );
+      },
+      size: 140,
+      enableSorting: false,
+    },
+    {
+      accessorKey: "mainConcept",
+      header: "فكرة التمرين",
+      cell: ({ row }) => {
+        const concept = row.original.mainConcept;
+        if (!concept) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        return (
+          <span className="line-clamp-1 max-w-[42ch] text-sm font-medium">
+            {concept}
+          </span>
+        );
+      },
+      size: 260,
       enableSorting: false,
     },
     {

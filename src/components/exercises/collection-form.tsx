@@ -21,8 +21,9 @@ import {
 import type { ExerciseCollection } from "@/types/exercises";
 
 const COLLECTION_TYPES = [
-  { value: "SERIES", label: "Series" },
-  { value: "BAC", label: "BAC" },
+  { value: "SERIES", label: "سلسلة" },
+  { value: "BAC", label: "بكالوريا" },
+  { value: "EXAM", label: "امتحان" },
 ] as const;
 
 interface CollectionFormProps {
@@ -51,7 +52,9 @@ export function CollectionForm({
     ...(defaultValues
       ? {
           title: defaultValues.title ?? "",
-          collectionType: (defaultValues.collectionType as CreateExerciseCollectionInput["collectionType"]) ?? "series",
+          collectionType:
+            (defaultValues.collectionType as CreateExerciseCollectionInput["collectionType"]) ??
+            "SERIES",
           year: defaultValues.year ?? null,
           unit: defaultValues.unit ?? null,
           pdfFileId: defaultValues.pdfFileId ?? "",
@@ -71,6 +74,18 @@ export function CollectionForm({
   });
 
   const collectionType = watch("collectionType");
+  const showYear = collectionType === "BAC" || collectionType === "EXAM";
+  const showUnit = collectionType === "SERIES";
+
+  function handleTypeChange(next: CreateExerciseCollectionInput["collectionType"]) {
+    setValue("collectionType", next, { shouldValidate: true, shouldDirty: true });
+    // Clear the field that no longer applies so stale values aren't persisted.
+    if (next === "SERIES") {
+      setValue("year", null, { shouldDirty: true });
+    } else {
+      setValue("unit", null, { shouldDirty: true });
+    }
+  }
 
   return (
     <form
@@ -96,9 +111,7 @@ export function CollectionForm({
         <Select
           value={collectionType}
           onValueChange={(v) =>
-            setValue("collectionType", v as CreateExerciseCollectionInput["collectionType"], {
-              shouldValidate: true,
-            })
+            handleTypeChange(v as CreateExerciseCollectionInput["collectionType"])
           }
         >
           <SelectTrigger id="collectionType" className="w-full">
@@ -119,27 +132,47 @@ export function CollectionForm({
         )}
       </div>
 
+      {/* Conditional fields: BAC/EXAM → year, SERIES → unit */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="year">السنة (اختياري)</Label>
-          <Input
-            id="year"
-            type="number"
-            placeholder="مثال: 2024"
-            autoComplete="off"
-            {...register("year", { valueAsNumber: true })}
-          />
-        </div>
+        {showYear ? (
+          <div className="space-y-2">
+            <Label htmlFor="year">السنة (اختياري)</Label>
+            <Input
+              id="year"
+              type="number"
+              min={2000}
+              max={2100}
+              placeholder="مثال: 2024"
+              autoComplete="off"
+              {...register("year", {
+                setValueAs: (v) =>
+                  v === "" || v == null ? null : Number(v),
+              })}
+            />
+            {errors.year && (
+              <p className="text-destructive text-xs">
+                {errors.year.message as string}
+              </p>
+            )}
+          </div>
+        ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="unit">الوحدة (اختياري)</Label>
-          <Input
-            id="unit"
-            placeholder="مثال: الوحدة الأولى"
-            autoComplete="off"
-            {...register("unit")}
-          />
-        </div>
+        {showUnit ? (
+          <div className="space-y-2">
+            <Label htmlFor="unit">الوحدة (اختياري)</Label>
+            <Input
+              id="unit"
+              placeholder="مثال: الوحدة الأولى"
+              autoComplete="off"
+              {...register("unit")}
+            />
+            {errors.unit && (
+              <p className="text-destructive text-xs">
+                {errors.unit.message as string}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-2">

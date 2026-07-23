@@ -32,12 +32,11 @@ export interface ExerciseJson {
 
 export interface Exercise {
   id: string;
-  title: string;
-  exerciseNature: string | null;
+  exerciseMode: string | null;
   exerciseJson: ExerciseJson | null;
   collectionId: string | null;
   exerciseNumber: number | null;
-  concept: string | null;
+  mainConcept: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

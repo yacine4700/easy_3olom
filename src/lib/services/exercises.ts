@@ -99,12 +99,11 @@ const EXERCISES_TABLE = "exercises";
 
 type ExerciseRow = {
   id: number | string;
-  title: string;
-  exercise_nature: string | null;
+  exercise_mode: string | null;
   exercise_json: ExerciseJson | null;
   collection_id: number | string | null;
   exercise_number: number | null;
-  concept: string | null;
+  main_concept: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -112,12 +111,11 @@ type ExerciseRow = {
 function exerciseToDomain(r: ExerciseRow): Exercise {
   return {
     id: String(r.id),
-    title: r.title,
-    exerciseNature: r.exercise_nature,
+    exerciseMode: r.exercise_mode,
     exerciseJson: r.exercise_json,
     collectionId: r.collection_id != null ? String(r.collection_id) : null,
     exerciseNumber: r.exercise_number,
-    concept: r.concept,
+    mainConcept: r.main_concept,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -134,7 +132,7 @@ export async function listExercises(query: ListExercisesQuery): Promise<Exercise
   const { search, collectionId, page, pageSize } = query;
   let req = supabase.from(EXERCISES_TABLE).select("*", { count: "exact" });
   if (collectionId) req = req.eq("collection_id", collectionId);
-  if (search) req = req.ilike("title", `%${search}%`);
+  if (search) req = req.ilike("main_concept", `%${search}%`);
   req = req.order("created_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
   const { data, error, count } = await req;
   if (error) throw error;
@@ -151,12 +149,11 @@ export async function createExercise(input: CreateExerciseInput): Promise<Exerci
   const { data, error } = await supabase
     .from(EXERCISES_TABLE)
     .insert({
-      title: input.title,
-      exercise_nature: input.exerciseNature ?? null,
+      exercise_mode: input.exerciseMode,
       exercise_json: input.exerciseJson,
       collection_id: input.collectionId ? Number(input.collectionId) : null,
       exercise_number: input.exerciseNumber ?? null,
-      concept: input.concept ?? null,
+      main_concept: input.mainConcept ?? null,
     })
     .select().single();
   if (error || !data) throw error ?? new Error("Create failed");
@@ -165,12 +162,11 @@ export async function createExercise(input: CreateExerciseInput): Promise<Exerci
 
 export async function updateExercise(id: string, input: UpdateExerciseInput): Promise<Exercise | null> {
   const update: Record<string, unknown> = {};
-  if (input.title !== undefined) update.title = input.title;
-  if (input.exerciseNature !== undefined) update.exercise_nature = input.exerciseNature;
+  if (input.exerciseMode !== undefined) update.exercise_mode = input.exerciseMode;
   if (input.exerciseJson !== undefined) update.exercise_json = input.exerciseJson;
   if (input.collectionId !== undefined) update.collection_id = input.collectionId ? Number(input.collectionId) : null;
   if (input.exerciseNumber !== undefined) update.exercise_number = input.exerciseNumber;
-  if (input.concept !== undefined) update.concept = input.concept;
+  if (input.mainConcept !== undefined) update.main_concept = input.mainConcept;
   const { data, error } = await supabase.from(EXERCISES_TABLE).update(update).eq("id", id).select().single();
   if (error || !data) return null;
   return exerciseToDomain(data as ExerciseRow);

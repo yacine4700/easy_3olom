@@ -37,16 +37,22 @@ export function DeleteExerciseDialog({
     });
   }
 
+  // No `title` on exercises anymore — identify by mainConcept, falling back
+  // to the exercise number (e.g. "التمرين #2").
+  const label =
+    exercise?.mainConcept?.trim() ||
+    (exercise?.exerciseNumber != null
+      ? `التمرين رقم ${exercise.exerciseNumber}`
+      : "هذا التمرين");
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>حذف التمرين؟</AlertDialogTitle>
           <AlertDialogDescription>
-            سيتم حذف التمرين{" "}
-            <span className="text-foreground font-medium">
-              {exercise?.title}
-            </span>{" "}
+            سيتم حذف{" "}
+            <span className="text-foreground font-medium">{label}</span>{" "}
             بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
           </AlertDialogDescription>
         </AlertDialogHeader>

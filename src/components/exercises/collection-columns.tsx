@@ -20,6 +20,12 @@ export interface CollectionRowActions {
   onDelete: (collection: ExerciseCollection) => void;
 }
 
+const COLLECTION_TYPE_LABELS: Record<string, string> = {
+  SERIES: "سلسلة",
+  BAC: "بكالوريا",
+  EXAM: "امتحان",
+};
+
 function RowActionsCell({
   collection,
   actions,
@@ -91,27 +97,30 @@ export function getCollectionColumns(
       accessorKey: "title",
       header: "العنوان",
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.title}</span>
+        <span className="text-start font-medium">{row.original.title}</span>
       ),
     },
     {
       accessorKey: "collectionType",
       header: "النوع",
-      cell: ({ row }) =>
-        row.original.collectionType ? (
+      cell: ({ row }) => {
+        const type = row.original.collectionType;
+        if (!type) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        return (
           <Badge variant="secondary" className="text-xs">
-            {row.original.collectionType}
+            {COLLECTION_TYPE_LABELS[type] ?? type}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        ),
+        );
+      },
       size: 120,
     },
     {
       accessorKey: "year",
       header: "السنة",
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-muted-foreground text-sm text-start">
           {row.original.year ?? "—"}
         </span>
       ),
@@ -121,7 +130,7 @@ export function getCollectionColumns(
       accessorKey: "unit",
       header: "الوحدة",
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-muted-foreground text-sm text-start">
           {row.original.unit || "—"}
         </span>
       ),
