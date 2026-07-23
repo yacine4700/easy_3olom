@@ -129,6 +129,8 @@ function buildExercisesQueryString(query: ListExercisesQuery) {
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
   if (query.collectionId) params.set("collectionId", query.collectionId);
+  if (query.difficulty) params.set("difficulty", query.difficulty);
+  if (query.isBacBased) params.set("isBacBased", query.isBacBased);
   params.set("page", String(query.page));
   params.set("pageSize", String(query.pageSize));
   return params.toString();

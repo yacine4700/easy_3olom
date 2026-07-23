@@ -29,6 +29,8 @@ export function ExercisesView({
   const [filters, setFilters] = React.useState<ExercisesTableFilters>({
     search: "",
     collectionId: "",
+    difficulty: "",
+    isBacBased: "",
   });
 
   // Debounce search so we don't fire a request on every keystroke.
@@ -42,10 +44,17 @@ export function ExercisesView({
     () => ({
       search: debouncedSearch || undefined,
       collectionId: filters.collectionId || undefined,
+      difficulty: filters.difficulty || undefined,
+      isBacBased: filters.isBacBased || undefined,
       page: 1,
       pageSize: 50,
     }),
-    [debouncedSearch, filters.collectionId],
+    [
+      debouncedSearch,
+      filters.collectionId,
+      filters.difficulty,
+      filters.isBacBased,
+    ],
   );
 
   const { data, isLoading, isFetching } = useExercises(exercisesQuery);

@@ -550,3 +550,74 @@ Stage Summary:
 - Schema alignment complete: title gone, exerciseMode/mainConcept/exerciseNumber(number) everywhere; collectionType gains EXAM with conditional year/unit via `watch`.
 - RTL: `text-left`→`text-start` in the shared primitive is the real fix; `dir="rtl"` + `text-start` added to exercise table containers as belt-and-suspenders.
 - Dynamic parts/questions/documents/rubric structure preserved unchanged — only top-level exercise fields changed.
+
+---
+
+## EXERCISES-DIFFICULTY — Add `difficulty` + `isBacBased` to the Exercises UI
+
+Background: two new columns were added to the `exercises` table — `difficulty` (text: EASY/MEDIUM/HARD) and `is_bac_based` (boolean, default false). Types, validators and service were already updated; this task wires the new fields through the UI layer only (no schema/service changes).
+
+Files updated (5):
+
+`src/hooks/queries/use-exercises.ts`:
+- `buildExercisesQueryString` now emits `difficulty` and `isBacBased` params (when present) alongside the existing `search`/`collectionId`/page params. The `ListExercisesQuery` type already had `difficulty?: string` and `isBacBased?: string` from the validator change, so the hook signature is unchanged — only the URL builder changed.
+
+`src/components/exercises/exercise-form.tsx`:
+- `ExerciseFormValues` local type extended with `difficulty: string` ("" = unset) and `isBacBased: boolean`.
+- Added `EXERCISE_DIFFICULTIES` constant: `[{EASY, سهل}, {MEDIUM, متوسط}, {HARD, صعب}]`.
+- `valuesFromExercise` pre-populates `difficulty` from `exercise.difficulty ?? ""` and `isBacBased` from `exercise.isBacBased ?? false` so edit mode hydrates the new fields correctly.
+- New form row (after the exerciseMode/mainConcept grid, before the context Textarea) with two columns:
+  - **difficulty**: Select dropdown bound via `watch("difficulty")` + `setValue("difficulty", …)` — same pattern as exerciseMode/collectionId. Has a "— غير محدد —" placeholder value, an `errors.difficulty` message slot, and a submit-time presence check that calls `setError("difficulty", …)` with message "اختر الصعوبة".
+  - **isBacBased**: shadcn `Switch` bound via `watch("isBacBased")` + `setValue("isBacBased", checked)`. Wrapped in a `flex h-9 items-center gap-2` row so it vertically aligns with the other inputs; a small "نعم"/"لا" muted label reflects the current state.
+- `handleFormSubmit` builds `CreateExerciseInput` with `difficulty: values.difficulty as CreateExerciseInput["difficulty"]` and `isBacBased: values.isBacBased`. The cast is safe because of the submit-time presence check.
+- Added `import { Switch } from "@/components/ui/switch";` — all other UI primitives already imported.
+- Did NOT touch the dynamic `parts`/`questions`/`rubric` JSON structure or `buildExerciseJson()`.
+
+`src/components/exercises/exercise-columns.tsx`:
+- Added a `difficulty` column (size 120) inserted between `exerciseMode` and `mainConcept`:
+  - EASY → green-tinted Badge (🟢 dot via `bg-green-500`, body `bg-green-500/10 text-green-700 dark:text-green-400`) labeled "سهل".
+  - MEDIUM → amber-tinted Badge (🟡 dot via `bg-amber-500`) labeled "متوسط".
+  - HARD → red-tinted Badge (🔴 dot via `bg-red-500`) labeled "صعب".
+  - null/unknown → muted "—".
+  - Each badge uses an inline `<span className="size-2 rounded-full …dot">` rather than the emoji so the colored dot actually renders as a circle (emoji rendering varies by platform). Task description referenced the emoji semantics; the colored dot conveys the same information more reliably.
+- Added an `isBacBased` column (size 160) inserted after `difficulty`:
+  - true → Badge with 🎓 emoji + "مقتبس من البكالوريا", using `bg-primary/10 text-primary`.
+  - false/undefined → muted "—".
+- Both new columns: `enableSorting: false`, consistent with the rest of the table.
+- `getExerciseColumns` returns them in order: select / exerciseNumber / exerciseMode / **difficulty** / **isBacBased** / mainConcept / collection / actions. The shared `exercises-table.tsx` consumes columns via `getExerciseColumns(...)` so the new columns appear automatically — no table file edit needed.
+
+`src/components/exercises/exercises-toolbar.tsx`:
+- `ExercisesTableFilters` extended with `difficulty: string` ("" = all) and `isBacBased: string` ("" = all, else "true"/"false" — matches the service's string-based filter convention).
+- Two new Select dropdowns inserted after the collection filter, before the "مسح" reset button:
+  - **difficulty filter** (sm:w-[150px]): الكل / سهل (EASY) / متوسط (MEDIUM) / صعب (HARD), with `aria-label="فلتر الصعوبة"`.
+  - **isBacBased filter** (sm:w-[180px]): الكل / مقتبس من البكالوريا (true) / غير مقتبس (false), with `aria-label="فلتر البكالوريا"`.
+- `hasActiveFilters` now also checks the two new fields; `reset()` clears them too.
+- No new imports needed (Select primitives already imported).
+
+`src/components/exercises/exercises-view.tsx`:
+- Initial filter state extended to `{ search: "", collectionId: "", difficulty: "", isBacBased: "" }`.
+- `exercisesQuery` memo now spreads `difficulty: filters.difficulty || undefined` and `isBacBased: filters.isBacBased || undefined` into the query object (so empty strings become undefined → omitted from the URL by the hook builder).
+- `useMemo` dependency array extended to include `filters.difficulty` and `filters.isBacBased` so the query refetches when the new filters change.
+
+Files NOT touched (and why):
+- `exercises-table.tsx` — pulls columns via `getExerciseColumns(...)`, so new columns render automatically.
+- `exercise-dialog.tsx` — passes the whole `exercise` to `ExerciseForm`, which now consumes `difficulty`/`isBacBased` from `defaultValues`.
+- `delete-exercise-dialog.tsx` — uses `mainConcept`/`exerciseNumber` for the label; not affected.
+- `src/app/api/exercises/route.ts` — already reads all query params via `Object.fromEntries(searchParams.entries())` and passes them to `listExercisesQuerySchema` which already accepts `difficulty`/`isBacBased`. No route change needed.
+
+Conventions:
+- All user-facing strings in Arabic.
+- Logical CSS properties used throughout (`text-start`, `text-end`, `ps-8`, `start-2.5`, `me-`/`ms-`-free; only `start`/`end` logical anchors).
+- Existing shadcn primitives reused (Select, Switch, Badge); no new components created.
+- RTL: page-level `dir="rtl"` handles directionality; the toolbar/form/columns use only logical properties.
+
+Verification (grep):
+- No `text-left`/`text-right` introduced in any of the 5 modified files.
+- No remaining `exercise?.title` / `.exerciseNature` / `.concept` regressions.
+- Did NOT run lint or dev server per instructions.
+
+Stage Summary:
+- All 5 listed files updated; new fields flow end-to-end: form submit → service → DB → list query (with filter) → columns → toolbar filter → view state.
+- Difficulty is required on create (matches the non-optional zod enum); isBacBased defaults to false on create (matches zod default).
+- Both fields round-trip correctly through edit mode (pre-populated from `defaultValues`).
+- Filter state and reset button consistently include the new fields; the new query params match the API's `listExercisesQuerySchema`.

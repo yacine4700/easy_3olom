@@ -133,6 +133,75 @@ export function getExerciseColumns(
       enableSorting: false,
     },
     {
+      accessorKey: "difficulty",
+      header: "الصعوبة",
+      cell: ({ row }) => {
+        const difficulty = row.original.difficulty;
+        if (!difficulty) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const config: Record<
+          string,
+          { label: string; dot: string; className: string }
+        > = {
+          EASY: {
+            label: "سهل",
+            dot: "bg-green-500",
+            className:
+              "border-transparent bg-green-500/10 text-green-700 dark:text-green-400",
+          },
+          MEDIUM: {
+            label: "متوسط",
+            dot: "bg-amber-500",
+            className:
+              "border-transparent bg-amber-500/10 text-amber-700 dark:text-amber-400",
+          },
+          HARD: {
+            label: "صعب",
+            dot: "bg-red-500",
+            className:
+              "border-transparent bg-red-500/10 text-red-700 dark:text-red-400",
+          },
+        };
+        const cfg = config[difficulty];
+        if (!cfg) {
+          return (
+            <Badge variant="outline" className="text-xs">
+              {difficulty}
+            </Badge>
+          );
+        }
+        return (
+          <Badge className={`gap-1.5 text-xs ${cfg.className}`}>
+            <span className={`inline-block size-2 rounded-full ${cfg.dot}`} />
+            {cfg.label}
+          </Badge>
+        );
+      },
+      size: 120,
+      enableSorting: false,
+    },
+    {
+      accessorKey: "isBacBased",
+      header: "البكالوريا",
+      cell: ({ row }) => {
+        const isBac = row.original.isBacBased;
+        if (!isBac) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        return (
+          <Badge
+            className="gap-1 border-transparent bg-primary/10 text-primary text-xs"
+          >
+            <span aria-hidden>🎓</span>
+            مقتبس من البكالوريا
+          </Badge>
+        );
+      },
+      size: 160,
+      enableSorting: false,
+    },
+    {
       accessorKey: "mainConcept",
       header: "فكرة التمرين",
       cell: ({ row }) => {
