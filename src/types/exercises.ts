@@ -6,6 +6,8 @@ export interface ExerciseCollection {
   year: number | null;
   unit: string | null;
   pdfFileId: string | null;
+  stream: string | null;
+  version: number | null;
   createdAt: string | null;
 }
 

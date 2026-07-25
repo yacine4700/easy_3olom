@@ -26,6 +26,16 @@ const COLLECTION_TYPES = [
   { value: "EXAM", label: "امتحان" },
 ] as const;
 
+const STREAMS = [
+  { value: "SCIENCE", label: "علوم تجريبية" },
+  { value: "MATH", label: "رياضيات" },
+] as const;
+
+const VERSIONS = [
+  { value: "1", label: "الموضوع الأول" },
+  { value: "2", label: "الموضوع الثاني" },
+] as const;
+
 interface CollectionFormProps {
   defaultValues?: Partial<ExerciseCollection>;
   onSubmit: (values: CreateExerciseCollectionInput) => void;
@@ -39,6 +49,8 @@ const EMPTY: CreateExerciseCollectionInput = {
   year: null,
   unit: null,
   pdfFileId: "",
+  stream: null,
+  version: null,
 };
 
 export function CollectionForm({
@@ -58,6 +70,8 @@ export function CollectionForm({
           year: defaultValues.year ?? null,
           unit: defaultValues.unit ?? null,
           pdfFileId: defaultValues.pdfFileId ?? "",
+          stream: defaultValues.stream ?? null,
+          version: defaultValues.version ?? null,
         }
       : {}),
   };
@@ -74,23 +88,40 @@ export function CollectionForm({
   });
 
   const collectionType = watch("collectionType");
+  const stream = watch("stream");
+  const version = watch("version");
   const showYear = collectionType === "BAC" || collectionType === "EXAM";
   const showUnit = collectionType === "SERIES";
+  const showBacFields = collectionType === "BAC";
 
   function handleTypeChange(next: CreateExerciseCollectionInput["collectionType"]) {
     setValue("collectionType", next, { shouldValidate: true, shouldDirty: true });
-    // Clear the field that no longer applies so stale values aren't persisted.
     if (next === "SERIES") {
       setValue("year", null, { shouldDirty: true });
+      setValue("stream", null, { shouldDirty: true });
+      setValue("version", null, { shouldDirty: true });
     } else {
       setValue("unit", null, { shouldDirty: true });
+      if (next !== "BAC") {
+        setValue("stream", null, { shouldDirty: true });
+        setValue("version", null, { shouldDirty: true });
+      }
     }
+  }
+
+  function handleFormSubmit(raw: CreateExerciseCollectionInput) {
+    // For SERIES: strip stream/version entirely
+    if (raw.collectionType === "SERIES") {
+      raw.stream = null;
+      raw.version = null;
+    }
+    onSubmit(raw);
   }
 
   return (
     <form
       id="exercise-collection-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit(handleFormSubmit)}
       className="space-y-4"
     >
       <div className="space-y-2">
@@ -132,7 +163,7 @@ export function CollectionForm({
         )}
       </div>
 
-      {/* Conditional fields: BAC/EXAM → year, SERIES → unit */}
+      {/* Conditional: BAC/EXAM → year, SERIES → unit */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {showYear ? (
           <div className="space-y-2">
@@ -149,11 +180,6 @@ export function CollectionForm({
                   v === "" || v == null ? null : Number(v),
               })}
             />
-            {errors.year && (
-              <p className="text-destructive text-xs">
-                {errors.year.message as string}
-              </p>
-            )}
           </div>
         ) : null}
 
@@ -166,14 +192,65 @@ export function CollectionForm({
               autoComplete="off"
               {...register("unit")}
             />
-            {errors.unit && (
-              <p className="text-destructive text-xs">
-                {errors.unit.message as string}
-              </p>
-            )}
           </div>
         ) : null}
       </div>
+
+      {/* BAC-only fields: stream + version */}
+      {showBacFields ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="stream">الشعبة</Label>
+            <Select
+              value={stream ?? "none"}
+              onValueChange={(v) =>
+                setValue("stream", v === "none" ? null : v, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+            >
+              <SelectTrigger id="stream" className="w-full">
+                <SelectValue placeholder="اختر الشعبة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— غير محدد —</SelectItem>
+                {STREAMS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="version">الموضوع</Label>
+            <Select
+              value={version != null ? String(version) : "none"}
+              onValueChange={(v) =>
+                setValue(
+                  "version",
+                  v === "none" ? null : Number(v),
+                  { shouldValidate: true, shouldDirty: true },
+                )
+              }
+            >
+              <SelectTrigger id="version" className="w-full">
+                <SelectValue placeholder="اختر الموضوع" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— غير محدد —</SelectItem>
+                {VERSIONS.map((v) => (
+                  <SelectItem key={v.value} value={v.value}>
+                    {v.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="pdfFileId">معرف ملف PDF</Label>

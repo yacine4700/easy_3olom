@@ -9,6 +9,8 @@ export const createExerciseCollectionSchema = z.object({
   year: z.number().int().min(2000).max(2100).nullable().optional(),
   unit: z.string().max(200).nullable().optional(),
   pdfFileId: z.string().max(500).default(""),
+  stream: z.string().max(100).nullable().optional(),
+  version: z.number().int().min(1).max(99).nullable().optional(),
 });
 export const updateExerciseCollectionSchema = createExerciseCollectionSchema.partial();
 export const listExerciseCollectionsQuerySchema = z.object({

@@ -20,6 +20,8 @@ type CollectionRow = {
   year: number | null;
   unit: string | null;
   pdf_file_id: string | null;
+  stream: string | null;
+  version: number | null;
   created_at: string | null;
 };
 
@@ -31,6 +33,8 @@ function collectionToDomain(r: CollectionRow): ExerciseCollection {
     year: r.year,
     unit: r.unit,
     pdfFileId: r.pdf_file_id,
+    stream: r.stream,
+    version: r.version,
     createdAt: r.created_at,
   };
 }
@@ -69,6 +73,8 @@ export async function createExerciseCollection(input: CreateExerciseCollectionIn
       year: input.year ?? null,
       unit: input.unit ?? null,
       pdf_file_id: input.pdfFileId ?? "",
+      stream: input.stream ?? null,
+      version: input.version ?? null,
     })
     .select().single();
   if (error || !data) throw error ?? new Error("Create failed");
@@ -82,6 +88,8 @@ export async function updateExerciseCollection(id: string, input: UpdateExercise
   if (input.year !== undefined) update.year = input.year;
   if (input.unit !== undefined) update.unit = input.unit;
   if (input.pdfFileId !== undefined) update.pdf_file_id = input.pdfFileId;
+  if (input.stream !== undefined) update.stream = input.stream;
+  if (input.version !== undefined) update.version = input.version;
   const { data, error } = await supabase.from(COLLECTIONS_TABLE).update(update).eq("id", id).select().single();
   if (error || !data) return null;
   return collectionToDomain(data as CollectionRow);
