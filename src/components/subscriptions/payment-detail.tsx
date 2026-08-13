@@ -60,7 +60,7 @@ export function PaymentDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="end"
+        side="right"
         className="w-full gap-0 overflow-y-auto p-0 sm:max-w-lg"
       >
         <SheetHeader className="space-y-1 border-b p-6">
