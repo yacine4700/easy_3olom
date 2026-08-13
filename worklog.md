@@ -621,3 +621,81 @@ Stage Summary:
 - Difficulty is required on create (matches the non-optional zod enum); isBacBased defaults to false on create (matches zod default).
 - Both fields round-trip correctly through edit mode (pre-populated from `defaultValues`).
 - Filter state and reset button consistently include the new fields; the new query params match the API's `listExercisesQuerySchema`.
+
+---
+
+## SUBSCRIPTIONS — Build the Subscriptions & Users module (read-only)
+
+Agent: sub (general-purpose)
+Task: Add a new "Subscriptions & Users" section. Reuses the established vertical-slice pattern (types → validators → service → API routes → TanStack Query hooks → UI components → page + page-client → nav) but is READ-ONLY: no INSERT/UPDATE/DELETE anywhere — payments are reviewed through the Telegram bot + n8n flow, never from the admin UI.
+
+### Schema discovered (READ-ONLY — DB not modified)
+- `users`: id (uuid), telegram_user_id (bigint UNIQUE), username, first_name, last_name, language_code, status ('active'|'blocked'), created_at, updated_at, last_seen_at.
+- `plans`: id, code (UNIQUE), name, description, price (numeric ≥0), currency ('DZD' only), duration_days (>0), active (bool), created_at, updated_at.
+- `subscriptions`: id, user_id → users.id (NOT NULL), plan_id → plans.id (NOT NULL), status ('pending'|'active'|'expired'|'cancelled'|'suspended'), starts_at, expires_at (CHECK expires_at > starts_at), created_at, updated_at.
+- `payments`: id, user_id → users.id (NOT NULL), subscription_id → subscriptions.id (NULLABLE), amount (>0), currency ('DZD'), method ('ccp' only), status ('pending'|'approved'|'rejected'|'cancelled'), telegram_file_id, transaction_reference, notes, reviewed_by → admin_users.id (NULLABLE), reviewed_at, created_at, updated_at.
+- Actual data: 1 plan (basic, 800 DZD, 30d); all users active; all subscriptions active; all payments pending.
+
+### Files created (16 new + 1 updated)
+
+#### Types & validators
+- `src/types/subscriptions.ts` — `User`, `Plan`, `Subscription`, `Payment` (snake_case → camelCase), `SubscriptionWithRelations` (joined user+plan), `PaymentWithRelations` (joined user), `SubscriptionDetail` (joined + payments[]), `PaymentDetail` (joined + subscription+plan), `SubscriptionStats` (10 KPI fields). `UserStatus`, `SubscriptionStatus`, `PaymentStatus`, `PaymentMethod` union types.
+- `src/lib/validators/subscriptions.ts` — `listSubscriptionsQuerySchema` + `listPaymentsQuerySchema` (search/status/sort/page/pageSize). No create/update schemas — READ-ONLY module.
+
+#### Service (`src/lib/services/subscriptions.ts`)
+- `getSubscriptionStats()` — 10 parallel Supabase COUNT queries (head:true) + one approved-amounts sum. Stats failures degrade to 0 (the dashboard still renders); list endpoints still surface real errors.
+- `listSubscriptions(query)` — paginated, joins `user:users(*)` + `plan:plans(*)` via Supabase nested select. Search uses PostgREST dotted-notation OR filter: `user.first_name.ilike.%term%,user.last_name.ilike.%term%,user.username.ilike.%term%,plan.name.ilike.%term%`. Status filter via `.eq("status", …)`. Sort: newest (created_at desc) / oldest (asc).
+- `getSubscriptionDetail(id)` — single subscription with full joins, plus the subscription's own payments (separate parallel query).
+- `listPayments(query)` — paginated, joins `user:users(*)`. Search across user.name + transaction_reference + notes.
+- `getPaymentDetail(id)` — single payment with nested-nested join: `*, user:users(*), subscription:subscriptions(*, plan:plans(*))`.
+- Row → domain mappers convert snake_case DB rows to camelCase domain types and coerce `numeric` → `number` via `Number()`.
+- VERIFIED: zero `.insert()` / `.update()` / `.delete()` / `.upsert()` calls in the file (grep).
+
+#### API routes (4 files — GET only)
+- `src/app/api/subscriptions/route.ts` — GET list + `?stats=1` shortcut for the dashboard KPI fetch.
+- `src/app/api/subscriptions/[id]/route.ts` — GET detail.
+- `src/app/api/payments/route.ts` — GET list.
+- `src/app/api/payments/[id]/route.ts` — GET detail.
+- All routes follow the existing pattern: `Object.fromEntries(searchParams.entries())` → Zod `validate()` → service call → `ok()`. Next.js 16 async-params contract (`params: Promise<{ id: string }>` + `await params`). `isValidId` length guard.
+- VERIFIED: zero `useMutation`/`useCreate`/`useUpdate`/`useDelete` in hooks; zero write operations in services or routes (grep).
+
+#### TanStack Query hooks (`src/hooks/queries/use-subscriptions.ts`)
+- `subscriptionKeys` + `paymentKeys` colocated query-key factories.
+- `useSubscriptionStats()` — staleTime 60s (dashboard KPIs don't need to refetch on every focus).
+- `useSubscriptions(query)` / `usePayments(query)` — `placeholderData: prev` to avoid flicker on filter changes.
+- `useSubscriptionDetail(id)` / `usePaymentDetail(id)` — `enabled: Boolean(id)` so the detail Sheet doesn't fetch until opened.
+- NO mutation hooks — module is read-only.
+
+#### UI components (`src/components/subscriptions/` — 11 files)
+- `format.ts` — shared helpers: `getUserDisplayName` (first+last → @username → Telegram #id → "—"), `formatPrice` (ar-DZ Intl + " DZD"), `formatDate` / `formatDateTime` / `formatRelative` (date-fns + Arabic locale).
+- `user-status-badge.tsx` — active → أخضر "نشط" (emerald, CircleCheck), blocked → أحمر "محظور" (red, Ban).
+- `subscription-status-badge.tsx` — pending → أصفر "معلق" (amber, Clock), active → أخضر "نشط" (emerald, CircleCheck), expired → رمادي "منتهي" (zinc, CircleX), cancelled → أحمر "ملغي" (red, Ban), suspended → برتقالي "موقوف" (orange, Pause). Also exports `SUBSCRIPTION_STATUS_FILTER_OPTIONS` for the Select.
+- `payment-status-badge.tsx` — pending → أصفر "معلق" (amber, Clock), approved → أخضر "مقبول" (emerald, CircleCheck), rejected → أحمر "مرفوض" (red, CircleX), cancelled → رمادي "ملغي" (zinc, Ban). Also exports `PAYMENT_STATUS_FILTER_OPTIONS`.
+- `list-pagination.tsx` — shared card-list pagination footer (range text + page-size select + first/prev/next/last buttons). Uses chevrons pointing in the RTL-correct direction (ChevronsRight = first page, ChevronRight = previous, ChevronLeft = next, ChevronsLeft = last). Reusable across both lists.
+- `subscriptions-dashboard.tsx` — Server Component. Renders 7 KpiCard instances (إجمالي المستخدمين / اشتراكات نشطة / معلقة / منتهية / مدفوعات معلقة / مقبولة / الإيرادات). Reuses `KpiCard` from `analytics/kpi-card.tsx` so visual language matches the global Analytics page. Each card deep-links to `/subscriptions?tab=…&status=…`. Stats fetch failures fall back to zeros + console.error.
+- `subscription-detail.tsx` — Client Sheet (drawer) with sections: status banner / الاشتراك (dates) / المستخدم (name, telegram id, username, status, last_seen) / الخطة (name, code, price, duration) / المدفوعات المرتبطة (list). Fetches via `useSubscriptionDetail` only when the Sheet opens.
+- `subscriptions-list.tsx` — Client card grid (1/2/3 cols responsive). Toolbar: debounced search + status Select + sort Select + Clear. Each card shows user name + handle, status badge, plan name + code, price, start/end dates. Click → opens SubscriptionDetailSheet. Skeleton loading (6 placeholders) + empty state (Inbox icon).
+- `payment-detail.tsx` — Client Sheet with sections: amount + status banner / المدفوعة (method, reference, created, updated) / المراجعة (reviewer, reviewed_at) / المستخدم / الاشتراك المرتبط (optional, with nested plan) / ملاحظات / ملف الإيصال (telegram_file_id).
+- `payments-list.tsx` — Client card grid mirroring subscriptions-list. Each card shows user name + handle, large amount, status badge, method (CCP mono badge), date + transaction reference. Click → opens PaymentDetailSheet.
+- `subscriptions-page-client.tsx` — Client wrapper owning the active-tab state. Renders `<Tabs>` with three tabs: نظرة عامة / الاشتراكات / المدفوعات. Receives the server-rendered dashboard as a `React.ReactNode` prop (avoids re-fetching KPIs on the client).
+
+#### Page (`src/app/(admin)/subscriptions/page.tsx`)
+- Server Component, `metadata: { title: "الاشتراكات والمستخدمين" }`.
+- Next.js 16 async-params contract for `searchParams: Promise<{ tab?: string }>`; whitelists `tab` against `["overview","subscriptions","payments"]`.
+- Renders `<SubscriptionsDashboard />` server-side (awaited), passes the resulting React tree as the `dashboard` prop to `<SubscriptionsPageClient>`. Dashboard data fetch happens during SSR — no client-side KPI refetch on first paint.
+
+#### Navigation
+- `src/config/navigation.ts` — added `CreditCard` to the lucide-react import; inserted the new item into the existing "engagement" group (between exercises and analytics): `{ key: "subscriptions", title: "الاشتراكات", href: "/subscriptions", icon: CreditCard, description: "إدارة المستخدمين والاشتراكات والمدفوعات" }`.
+
+### Conventions
+- All user-facing strings Arabic; RTL inherited from `<html dir="rtl">`; logical CSS properties used throughout (`ps-8`, `start-2.5`, `text-start`, `text-end`, `me-*`/`ms-*` only where asymmetric). VERIFIED: zero `text-left`/`text-right`/`ml-`/`mr-`/`pl-`/`pr-`/`left-`/`right-` occurrences in `src/components/subscriptions/` (grep).
+- Existing shadcn primitives reused (Tabs, Sheet, Card, Badge, Button, Input, Select, Skeleton). No new UI primitives added. The shared `KpiCard` from `analytics/` is reused for visual consistency with the global Analytics dashboard.
+- Card-based layout (not tables) per the spec — both lists render responsive card grids with a custom `ListPagination` footer (the existing TanStack-Table pagination doesn't fit a card grid).
+- Read-only contract honored end-to-end: no POST/PATCH/DELETE routes, no mutation hooks, no write calls in the service.
+- Did NOT run lint or dev server per instructions.
+
+### Stage Summary
+- Subscriptions & Users module complete: 1 type file + 1 validator + 1 service + 4 API routes + 1 hooks file + 11 UI components + 1 page + 1 page-client + 1 nav edit.
+- READ-ONLY across the whole stack: real Supabase SELECTs only, no writes. Stats use `head:true` count queries (cheap SQL COUNTs) + one column-select for revenue sum.
+- Joins via Supabase nested selects (`*, user:users(*), plan:plans(*)` for subscriptions; `*, user:users(*), subscription:subscriptions(*, plan:plans(*))` for payment detail). Cross-table search uses PostgREST dotted-notation OR filters.
+- 5 of 9 nav items now live in the engagement group (student-questions, exercises, subscriptions, analytics, plus the dashboard is in overview). Module is ready for browser verification.
