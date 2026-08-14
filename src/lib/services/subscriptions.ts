@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { notifyWebhookAction, type WebhookAction } from "@/lib/webhook";
 import type {
   Payment,
   PaymentDetail,
@@ -12,7 +13,9 @@ import type {
 } from "@/types/subscriptions";
 import type {
   ListPaymentsQuery,
+  ListPlansQuery,
   ListSubscriptionsQuery,
+  ListUsersQuery,
 } from "@/lib/validators/subscriptions";
 
 /**
@@ -414,3 +417,157 @@ export async function getPaymentDetail(
       : null,
   };
 }
+
+// ── Plans list ──────────────────────────────────────────────────────────────────
+
+export interface PlanListResult {
+  items: Plan[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Paginated list of plans. READ-ONLY.
+ *
+ * Optional `active` boolean filter narrows to enabled/disabled plans, and
+ * `search` matches the plan's `code` or `name` (case-insensitive).
+ */
+export async function listPlans(
+  query: ListPlansQuery,
+): Promise<PlanListResult> {
+  const { search, active, sort, page, pageSize } = query;
+
+  let req = supabase
+    .from(PLANS_TABLE)
+    .select("*", { count: "exact" });
+
+  if (typeof active === "boolean") {
+    req = req.eq("active", active);
+  }
+
+  if (search) {
+    req = req.or(`code.ilike.%${search}%,name.ilike.%${search}%`);
+  }
+
+  const ascending = sort === "oldest";
+  req = req
+    .order("created_at", { ascending, nullsFirst: false })
+    .range((page - 1) * pageSize, page * pageSize - 1);
+
+  const { data, error, count } = await req;
+  if (error) throw error;
+
+  const rows = (data ?? []) as PlanRow[];
+  const items = rows.map(toPlan);
+
+  return { items, total: count ?? 0, page, pageSize };
+}
+
+// ── Users list ─────────────────────────────────────────────────────────────────
+
+export interface UserListResult {
+  items: User[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Paginated list of Telegram-bot users. READ-ONLY.
+ *
+ * `search` matches `username`, `first_name`, `last_name`, or the textual form
+ * of `telegram_user_id`. The optional `status` filter narrows to active/blocked.
+ */
+export async function listUsers(
+  query: ListUsersQuery,
+): Promise<UserListResult> {
+  const { search, status, sort, page, pageSize } = query;
+
+  let req = supabase
+    .from(USERS_TABLE)
+    .select("*", { count: "exact" });
+
+  if (status) {
+    req = req.eq("status", status);
+  }
+
+  if (search) {
+    req = req.or(
+      `username.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`,
+    );
+  }
+
+  const ascending = sort === "oldest";
+  req = req
+    .order("created_at", { ascending, nullsFirst: false })
+    .range((page - 1) * pageSize, page * pageSize - 1);
+
+  const { data, error, count } = await req;
+  if (error) throw error;
+
+  const rows = (data ?? []) as UserRow[];
+  const items = rows.map(toUser);
+
+  return { items, total: count ?? 0, page, pageSize };
+}
+
+// ── Payment actions (via Webhook only) ──────────────────────────────────────────
+//
+// The admin UI never writes to the `payments` table directly. Approve / reject
+// requests are sent to the configured webhook (Telegram bot / n8n) which is
+// the only writer. The webhook payload always carries the payment's current
+// fields alongside its id so the receiver has full context.
+
+/**
+ * Resolves a payment to its full row (with no joins) so we can send its
+ * fields to the webhook. Returns `null` when the id doesn't exist.
+ */
+async function fetchPaymentRow(id: string): Promise<PaymentRow | null> {
+  const { data, error } = await supabase
+    .from(PAYMENTS_TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return data as PaymentRow;
+}
+
+/**
+ * Send a payment action (`approve` / `reject`) to the webhook.
+ *
+ * Throws an `Error` with the webhook's failure message so the API route can
+ * surface it as a 400. The webhook receives:
+ *
+ *   { entity: "payment", action: "approve"|"reject",
+ *     data: { id, userId, subscriptionId, amount, currency, method,
+ *            status, transactionReference, telegramFileId, notes } }
+ */
+export async function reviewPayment(
+  id: string,
+  action: Extract<WebhookAction, "approve" | "reject">,
+): Promise<void> {
+  const row = await fetchPaymentRow(id);
+  if (!row) {
+    throw new Error("المدفوعة غير موجودة");
+  }
+
+  const data: Record<string, unknown> = {
+    id,
+    userId: row.user_id,
+    subscriptionId: row.subscription_id,
+    amount: Number(row.amount ?? 0),
+    currency: row.currency ?? "DZD",
+    method: row.method ?? "ccp",
+    status: row.status ?? "pending",
+    transactionReference: row.transaction_reference,
+    telegramFileId: row.telegram_file_id,
+    notes: row.notes,
+  };
+
+  const result = await notifyWebhookAction("payment", action, data);
+  if (!result.success) {
+    throw new Error(result.error ?? "فشل إرسال الإجراء إلى Webhook");
+  }
+}
+

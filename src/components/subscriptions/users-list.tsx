@@ -33,44 +33,37 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ListPagination } from "@/components/subscriptions/list-pagination";
-import {
-  SUBSCRIPTION_STATUS_FILTER_OPTIONS,
-  SubscriptionStatusBadge,
-} from "@/components/subscriptions/subscription-status-badge";
-import { SubscriptionDetailSheet } from "@/components/subscriptions/subscription-detail";
+import { UserStatusBadge } from "@/components/subscriptions/user-status-badge";
 import {
   DASH,
-  formatDate,
   formatDateTime,
-  formatPrice,
   getUserDisplayName,
 } from "@/components/subscriptions/format";
-import { useSubscriptions } from "@/hooks/queries/use-subscriptions";
-import type {
-  SubscriptionStatus,
-  SubscriptionWithRelations,
-} from "@/types/subscriptions";
+import { useUsers } from "@/hooks/queries/use-subscriptions";
+import type { User, UserStatus } from "@/types/subscriptions";
 
-type StatusFilter = "all" | SubscriptionStatus;
+type StatusFilter = "all" | UserStatus;
 type SortOrder = "newest" | "oldest";
 
-interface SubscriptionsTableFilters {
+interface UsersTableFilters {
   search: string;
+  status: StatusFilter;
   sort: SortOrder;
 }
 
-interface SubscriptionsTableProps {
-  /** Controlled status filter — lifted to the page so KPI cards can preset it. */
-  statusFilter: StatusFilter;
-  onStatusFilterChange: (status: StatusFilter) => void;
-}
-
-const DEFAULT_FILTERS: SubscriptionsTableFilters = {
+const DEFAULT_FILTERS: UsersTableFilters = {
   search: "",
+  status: "all",
   sort: "newest",
 };
 
 const PAGE_SIZE = 10;
+
+const USER_STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "كل الحالات" },
+  { value: "active", label: "نشط" },
+  { value: "blocked", label: "محظور" },
+];
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "newest", label: "الأحدث أولًا" },
@@ -78,78 +71,56 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
 ];
 
 /**
- * Subscriptions list — TanStack data table.
+ * Users list — TanStack data table, READ-ONLY.
  *
- * Replaces the previous card grid. Server-side pagination + search + status +
- * sort; the table component itself only handles the row layout and the row
- * click → Sheet detail. The status filter is controlled by the parent so KPI
- * cards can preset it (e.g. clicking "اشتراكات نشطة" sets status = `active`
- * and switches the tab).
- *
- * READ-ONLY — no create/edit/delete affordances.
+ * Lists the Telegram-bot users (created from the bot side, never from this
+ * admin UI). Mirrors the structure of the Subscriptions / Plans tables.
  */
-export function SubscriptionsTable({
-  statusFilter,
-  onStatusFilterChange,
-}: SubscriptionsTableProps) {
+export function UsersList() {
   const [filters, setFilters] =
-    React.useState<SubscriptionsTableFilters>(DEFAULT_FILTERS);
+    React.useState<UsersTableFilters>(DEFAULT_FILTERS);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE);
 
-  // Debounce search so typing doesn't fire a request per keystroke.
+  // Debounce search.
   const [debouncedSearch, setDebouncedSearch] = React.useState(filters.search);
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 300);
     return () => clearTimeout(t);
   }, [filters.search]);
 
-  // Reset to first page whenever filters change.
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, filters.sort, pageSize]);
+  }, [debouncedSearch, filters.status, filters.sort, pageSize]);
 
   const query = React.useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      status: statusFilter === "all" ? undefined : statusFilter,
+      status: filters.status === "all" ? undefined : filters.status,
       sort: filters.sort,
       page,
       pageSize,
     }),
-    [debouncedSearch, statusFilter, filters.sort, page, pageSize],
+    [debouncedSearch, filters.status, filters.sort, page, pageSize],
   );
 
-  const { data, isLoading, isFetching } = useSubscriptions(query);
+  const { data, isLoading, isFetching } = useUsers(query);
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  const [activeId, setActiveId] = React.useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = React.useState(false);
-
-  function openDetail(id: string) {
-    setActiveId(id);
-    setSheetOpen(true);
-  }
-
-  function update(patch: Partial<SubscriptionsTableFilters>) {
+  function update(patch: Partial<UsersTableFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
   }
-
   function reset() {
     setFilters(DEFAULT_FILTERS);
-    onStatusFilterChange("all");
   }
 
   const hasActiveFilters =
     filters.search !== "" ||
-    statusFilter !== "all" ||
+    filters.status !== "all" ||
     filters.sort !== "newest";
 
-  const columns = React.useMemo<ColumnDef<SubscriptionWithRelations>[]>(
-    () => buildColumns(),
-    [],
-  );
+  const columns = React.useMemo<ColumnDef<User>[]>(() => buildColumns(), []);
 
   const table = useReactTable({
     data: items,
@@ -166,15 +137,15 @@ export function SubscriptionsTable({
           <Input
             value={filters.search}
             onChange={(e) => update({ search: e.target.value })}
-            placeholder="بحث باسم المستخدم أو الخطة…"
+            placeholder="بحث باسم المستخدم أو معرّف تيليجرام…"
             className="h-9 ps-8"
-            aria-label="بحث في الاشتراكات"
+            aria-label="بحث في المستخدمين"
           />
         </div>
 
         <Select
-          value={statusFilter}
-          onValueChange={(v) => onStatusFilterChange(v as StatusFilter)}
+          value={filters.status}
+          onValueChange={(v) => update({ status: v as StatusFilter })}
         >
           <SelectTrigger
             className="h-9 w-full sm:w-[160px]"
@@ -183,7 +154,7 @@ export function SubscriptionsTable({
             <SelectValue placeholder="الحالة" />
           </SelectTrigger>
           <SelectContent>
-            {SUBSCRIPTION_STATUS_FILTER_OPTIONS.map((opt) => (
+            {USER_STATUS_FILTER_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>
@@ -263,19 +234,7 @@ export function SubscriptionsTable({
                 ))
               ) : items.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openDetail(row.original.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openDetail(row.original.id);
-                      }
-                    }}
-                    className="cursor-pointer"
-                  >
+                  <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
                         {flexRender(
@@ -288,14 +247,11 @@ export function SubscriptionsTable({
                 ))
               ) : (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-32"
-                  >
+                  <TableCell colSpan={columns.length} className="h-32">
                     <div className="flex flex-col items-center justify-center gap-2 text-center">
                       <Inbox className="text-muted-foreground/50 size-7" />
                       <p className="text-muted-foreground text-sm">
-                        لا توجد اشتراكات
+                        لا يوجد مستخدمون
                       </p>
                       <p className="text-muted-foreground/70 text-xs">
                         جرّب تعديل عوامل التصفية أو البحث بكلمة أخرى.
@@ -320,96 +276,48 @@ export function SubscriptionsTable({
           isLoading={isFetching}
         />
       )}
-
-      {/* Detail drawer */}
-      <SubscriptionDetailSheet
-        subscriptionId={activeId}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-      />
     </div>
   );
 }
 
 // ── Columns ────────────────────────────────────────────────────────────────────
 
-function buildColumns(): ColumnDef<SubscriptionWithRelations>[] {
+function buildColumns(): ColumnDef<User>[] {
   return [
     {
-      id: "user",
-      header: "المستخدم",
-      cell: ({ row }) => {
-        const user = row.original.user;
-        const name = getUserDisplayName(user);
-        return (
-          <div className="flex min-w-[14ch] flex-col gap-0.5">
-            <span className="truncate text-sm font-medium" title={name}>
-              {name}
-            </span>
-            <span className="text-muted-foreground truncate text-xs">
-              {user?.username
-                ? `@${user.username}`
-                : user?.telegramUserId != null
-                  ? `#${user.telegramUserId}`
-                  : DASH}
-            </span>
-          </div>
-        );
-      },
+      id: "telegramUserId",
+      header: "معرّف تيليجرام",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground font-mono text-xs tabular-nums">
+          {row.original.telegramUserId != null
+            ? `#${row.original.telegramUserId}`
+            : DASH}
+        </span>
+      ),
     },
     {
-      id: "plan",
-      header: "الخطة",
-      cell: ({ row }) => {
-        const plan = row.original.plan;
-        if (!plan) return <span className="text-muted-foreground text-xs">{DASH}</span>;
-        return (
-          <div className="flex min-w-[12ch] flex-col gap-0.5">
-            <span className="truncate text-sm font-medium" title={plan.name}>
-              {plan.name}
-            </span>
-            <span className="text-muted-foreground font-mono text-[10px] uppercase">
-              {plan.code}
-            </span>
-          </div>
-        );
-      },
+      accessorKey: "username",
+      header: "اسم المستخدم",
+      cell: ({ row }) => (
+        <span className="text-sm tabular-nums">
+          {row.original.username ? `@${row.original.username}` : DASH}
+        </span>
+      ),
     },
     {
-      id: "price",
-      header: "السعر",
+      id: "fullName",
+      header: "الاسم",
       cell: ({ row }) => {
-        const plan = row.original.plan;
-        if (!plan) return <span className="text-muted-foreground text-xs">{DASH}</span>;
+        const name = getUserDisplayName(row.original);
         return (
-          <span className="text-sm font-semibold tabular-nums">
-            {formatPrice(plan.price, plan.currency)}
-          </span>
+          <span className="text-sm font-medium">{name}</span>
         );
       },
     },
     {
       accessorKey: "status",
       header: "الحالة",
-      cell: ({ row }) => <SubscriptionStatusBadge status={row.original.status} />,
-    },
-    {
-      id: "startsAt",
-      header: "البداية",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {formatDate(row.original.startsAt)}
-        </span>
-      ),
-    },
-    {
-      id: "expiresAt",
-      header: "النهاية",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {formatDate(row.original.expiresAt)}
-        </span>
-      ),
+      cell: ({ row }) => <UserStatusBadge status={row.original.status} />,
     },
     {
       id: "createdAt",
@@ -417,6 +325,15 @@ function buildColumns(): ColumnDef<SubscriptionWithRelations>[] {
       cell: ({ row }) => (
         <span className="text-muted-foreground text-xs tabular-nums">
           {formatDateTime(row.original.createdAt)}
+        </span>
+      ),
+    },
+    {
+      id: "lastSeenAt",
+      header: "آخر ظهور",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {formatDateTime(row.original.lastSeenAt)}
         </span>
       ),
     },

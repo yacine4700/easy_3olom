@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { SubscriptionsDashboard } from "@/components/subscriptions/subscriptions-dashboard";
 import { SubscriptionsPageClient } from "@/components/subscriptions/subscriptions-page-client";
 
 export const metadata: Metadata = { title: "الاشتراكات والمستخدمين" };
@@ -8,29 +7,15 @@ export const metadata: Metadata = { title: "الاشتراكات والمستخ�
 /**
  * Subscriptions & Users page — Server Component.
  *
- * Renders the dashboard server-side (KPI cards from real Supabase counts) and
- * passes it as React children to the client wrapper, which owns the tab state.
+ * Previously rendered the dashboard server-side and honored `?tab=…&status=…`
+ * deep links. That URL coupling is gone now: the page is a thin wrapper that
+ * renders the client component, which owns the tab + filter state locally
+ * (so KPI cards can switch tabs and preset filters without touching the URL).
  *
- * Honors `?tab=…` deep links from the dashboard KPI cards so users land on
- * the relevant tab.
+ * The dashboard fetches its KPI counts client-side via the
+ * `useSubscriptionStats()` hook (one round-trip — same shape, just one fewer
+ * server boundary).
  */
-export default async function SubscriptionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
-  const { tab } = await searchParams;
-  const allowedTabs = ["overview", "subscriptions", "payments"] as const;
-  const initialTab = allowedTabs.includes(tab as (typeof allowedTabs)[number])
-    ? (tab as (typeof allowedTabs)[number])
-    : "overview";
-
-  const dashboard = await SubscriptionsDashboard();
-
-  return (
-    <SubscriptionsPageClient
-      dashboard={dashboard}
-      initialTab={initialTab}
-    />
-  );
+export default function SubscriptionsPage() {
+  return <SubscriptionsPageClient />;
 }

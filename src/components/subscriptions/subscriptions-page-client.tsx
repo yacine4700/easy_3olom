@@ -9,32 +9,50 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { SubscriptionsList } from "@/components/subscriptions/subscriptions-list";
-import { PaymentsList } from "@/components/subscriptions/payments-list";
-
-type TabValue = "overview" | "subscriptions" | "payments";
+import {
+  SubscriptionsDashboard,
+  type DashboardNavigateIntent,
+  type SubscriptionsTab,
+} from "@/components/subscriptions/subscriptions-dashboard";
+import { SubscriptionsTable } from "@/components/subscriptions/subscriptions-list";
+import { PaymentsTable } from "@/components/subscriptions/payments-list";
+import { PlansList } from "@/components/subscriptions/plans-list";
+import { UsersList } from "@/components/subscriptions/users-list";
+import type {
+  PaymentStatus,
+  SubscriptionStatus,
+} from "@/types/subscriptions";
 
 /**
  * Client page wrapper for the Subscriptions & Users module.
  *
- * Owns the active-tab state so deep links from the dashboard KPI cards
- * (`?tab=…`) can pre-select the right tab. The dashboard itself is a Server
- * Component (rendered server-side in `page.tsx` and passed through as React
- * children); the list + payments tabs are interactive client components.
+ * Owns:
+ *   - the active tab (local React state; no URL coupling),
+ *   - the subscriptions tab's status filter (lifted here so KPI cards can
+ *     preset it),
+ *   - the payments tab's status filter (same reason).
  *
- * NOTE: the dashboard KPI cards link here with `?tab=subscriptions` or
- * `?tab=payments` (and an optional `?status=…` query). The deep link lands
- * users on the right tab; the status filter itself is NOT auto-applied to
- * the list — users get a clean filter UI to apply themselves.
+ * KPI cards in the dashboard call `onNavigate({ tab, status? })` which sets
+ * both the tab and the appropriate filter — entirely in state, never touching
+ * the URL.
+ *
+ * Tabs: نظرة عامة | المستخدمون | الاشتراكات | المدفوعات | الخطط
  */
-export function SubscriptionsPageClient({
-  dashboard,
-  initialTab = "overview",
-}: {
-  dashboard: React.ReactNode;
-  initialTab?: TabValue;
-}) {
-  const [tab, setTab] = React.useState<TabValue>(initialTab);
+export function SubscriptionsPageClient() {
+  const [tab, setTab] = React.useState<SubscriptionsTab>("overview");
+  const [subscriptionStatus, setSubscriptionStatus] =
+    React.useState<"all" | SubscriptionStatus>("all");
+  const [paymentStatus, setPaymentStatus] =
+    React.useState<"all" | PaymentStatus>("all");
+
+  function handleNavigate(intent: DashboardNavigateIntent) {
+    setTab(intent.tab);
+    if (intent.tab === "subscriptions") {
+      setSubscriptionStatus(intent.status);
+    } else if (intent.tab === "payments") {
+      setPaymentStatus(intent.status);
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -54,23 +72,37 @@ export function SubscriptionsPageClient({
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as TabValue)}
+        onValueChange={(v) => setTab(v as SubscriptionsTab)}
         className="w-full"
       >
         <TabsList>
           <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
+          <TabsTrigger value="users">المستخدمون</TabsTrigger>
           <TabsTrigger value="subscriptions">الاشتراكات</TabsTrigger>
           <TabsTrigger value="payments">المدفوعات</TabsTrigger>
+          <TabsTrigger value="plans">الخطط</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          {dashboard}
+          <SubscriptionsDashboard onNavigate={handleNavigate} />
+        </TabsContent>
+        <TabsContent value="users" className="mt-4">
+          <UsersList />
         </TabsContent>
         <TabsContent value="subscriptions" className="mt-4">
-          <SubscriptionsList />
+          <SubscriptionsTable
+            statusFilter={subscriptionStatus}
+            onStatusFilterChange={setSubscriptionStatus}
+          />
         </TabsContent>
         <TabsContent value="payments" className="mt-4">
-          <PaymentsList />
+          <PaymentsTable
+            statusFilter={paymentStatus}
+            onStatusFilterChange={setPaymentStatus}
+          />
+        </TabsContent>
+        <TabsContent value="plans" className="mt-4">
+          <PlansList />
         </TabsContent>
       </Tabs>
     </div>

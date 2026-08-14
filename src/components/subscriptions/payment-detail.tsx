@@ -26,6 +26,7 @@ import {
 import { PaymentStatusBadge } from "@/components/subscriptions/payment-status-badge";
 import { SubscriptionStatusBadge } from "@/components/subscriptions/subscription-status-badge";
 import { UserStatusBadge } from "@/components/subscriptions/user-status-badge";
+import { PaymentActions } from "@/components/subscriptions/payment-actions";
 import {
   DASH,
   formatDate,
@@ -224,6 +225,20 @@ export function PaymentDetailSheet({
                 </p>
               )}
             </DetailSection>
+
+            {/* Review actions (only for pending payments) */}
+            {data.status === "pending" && (
+              <div className="border-t pt-4">
+                <p className="text-muted-foreground mb-2 text-xs">
+                  إجراءات المراجعة
+                </p>
+                <PaymentActions
+                  payment={data}
+                  variant="block"
+                  onDone={() => onOpenChange(false)}
+                />
+              </div>
+            )}
           </div>
         )}
       </SheetContent>

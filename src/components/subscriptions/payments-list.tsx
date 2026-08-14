@@ -2,17 +2,19 @@
 
 import * as React from "react";
 import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+} from "@tanstack/react-table";
+import {
   ArrowDownUp,
-  Calendar,
   Inbox,
   Search,
-  User as UserIcon,
-  Wallet,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,32 +24,50 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ListPagination } from "@/components/subscriptions/list-pagination";
 import {
   PAYMENT_STATUS_FILTER_OPTIONS,
   PaymentStatusBadge,
 } from "@/components/subscriptions/payment-status-badge";
 import { PaymentDetailSheet } from "@/components/subscriptions/payment-detail";
-import { formatDateTime, formatPrice, getUserDisplayName } from "@/components/subscriptions/format";
+import { PaymentActions } from "@/components/subscriptions/payment-actions";
+import {
+  DASH,
+  formatDateTime,
+  formatPrice,
+  getUserDisplayName,
+} from "@/components/subscriptions/format";
 import { usePayments } from "@/hooks/queries/use-subscriptions";
 import type { PaymentStatus, PaymentWithRelations } from "@/types/subscriptions";
 
 type StatusFilter = "all" | PaymentStatus;
 type SortOrder = "newest" | "oldest";
 
-interface PaymentsListFilters {
+interface PaymentsTableFilters {
   search: string;
-  status: StatusFilter;
   sort: SortOrder;
 }
 
-const DEFAULT_FILTERS: PaymentsListFilters = {
+interface PaymentsTableProps {
+  /** Controlled status filter — lifted to the page so KPI cards can preset it. */
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (status: StatusFilter) => void;
+}
+
+const DEFAULT_FILTERS: PaymentsTableFilters = {
   search: "",
-  status: "all",
   sort: "newest",
 };
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 10;
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "newest", label: "الأحدث أولًا" },
@@ -55,18 +75,24 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
 ];
 
 /**
- * Payments list — card-based (not a table).
+ * Payments list — TanStack data table.
  *
- * Each card shows the user's display name, the payment amount (large),
- * a colored status badge, the method (CCP), and the creation date. Clicking
- * a card opens a Sheet (drawer) with the full payment detail.
+ * Replaces the previous card grid. Server-side pagination + search + status +
+ * sort; the table component itself only handles the row layout and the row
+ * click → Sheet detail. The status filter is controlled by the parent so KPI
+ * cards can preset it (e.g. clicking "مدفوعات معلقة" sets status = `pending`
+ * and switches the tab).
  *
- * READ-ONLY — no create/edit/delete affordances. Payment approval happens
- * through the Telegram bot + n8n flow.
+ * A trailing "إجراءات" column renders Approve / Reject buttons inline for
+ * `pending` payments — those go through the webhook via the
+ * `useReviewPayment` mutation (see `payment-actions.tsx`).
  */
-export function PaymentsList() {
+export function PaymentsTable({
+  statusFilter,
+  onStatusFilterChange,
+}: PaymentsTableProps) {
   const [filters, setFilters] =
-    React.useState<PaymentsListFilters>(DEFAULT_FILTERS);
+    React.useState<PaymentsTableFilters>(DEFAULT_FILTERS);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE);
 
@@ -80,17 +106,17 @@ export function PaymentsList() {
   // Reset to first page whenever filters change.
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, filters.status, filters.sort, pageSize]);
+  }, [debouncedSearch, statusFilter, filters.sort, pageSize]);
 
   const query = React.useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      status: filters.status === "all" ? undefined : filters.status,
+      status: statusFilter === "all" ? undefined : statusFilter,
       sort: filters.sort,
       page,
       pageSize,
     }),
-    [debouncedSearch, filters.status, filters.sort, page, pageSize],
+    [debouncedSearch, statusFilter, filters.sort, page, pageSize],
   );
 
   const { data, isLoading, isFetching } = usePayments(query);
@@ -105,16 +131,34 @@ export function PaymentsList() {
     setSheetOpen(true);
   }
 
-  function update(patch: Partial<PaymentsListFilters>) {
+  function closeDetail() {
+    setSheetOpen(false);
+  }
+
+  function update(patch: Partial<PaymentsTableFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
   function reset() {
     setFilters(DEFAULT_FILTERS);
+    onStatusFilterChange("all");
   }
 
   const hasActiveFilters =
-    filters.search !== "" || filters.status !== "all" || filters.sort !== "newest";
+    filters.search !== "" ||
+    statusFilter !== "all" ||
+    filters.sort !== "newest";
+
+  const columns = React.useMemo<ColumnDef<PaymentWithRelations>[]>(
+    () => buildColumns(),
+    [],
+  );
+
+  const table = useReactTable({
+    data: items,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   return (
     <div className="space-y-4">
@@ -132,8 +176,8 @@ export function PaymentsList() {
         </div>
 
         <Select
-          value={filters.status}
-          onValueChange={(v) => update({ status: v as StatusFilter })}
+          value={statusFilter}
+          onValueChange={(v) => onStatusFilterChange(v as StatusFilter)}
         >
           <SelectTrigger
             className="h-9 w-full sm:w-[160px]"
@@ -183,36 +227,97 @@ export function PaymentsList() {
         )}
       </div>
 
-      {/* Cards grid */}
+      {/* Table */}
       <div
         data-loading={isFetching && !isLoading}
         className="relative transition-opacity data-[loading=true]:opacity-70"
       >
-        {isLoading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-16 text-center">
-            <Inbox className="text-muted-foreground/50 size-8" />
-            <p className="text-muted-foreground text-sm">لا توجد مدفوعات</p>
-            <p className="text-muted-foreground/70 text-xs">
-              جرّب تعديل عوامل التصفية أو البحث بكلمة أخرى.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((payment) => (
-              <PaymentCard
-                key={payment.id}
-                payment={payment}
-                onOpen={() => openDetail(payment.id)}
-              />
-            ))}
-          </div>
-        )}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="h-10">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow
+                    key={`skeleton-${i}`}
+                    className="hover:bg-transparent"
+                  >
+                    {columns.map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-5 w-full max-w-[16ch]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : items.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetail(row.original.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetail(row.original.id);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        // Prevent the actions cell from triggering a row click.
+                        onClick={
+                          cell.column.id === "actions"
+                            ? (e) => e.stopPropagation()
+                            : undefined
+                        }
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-32"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2 text-center">
+                      <Inbox className="text-muted-foreground/50 size-7" />
+                      <p className="text-muted-foreground text-sm">
+                        لا توجد مدفوعات
+                      </p>
+                      <p className="text-muted-foreground/70 text-xs">
+                        جرّب تعديل عوامل التصفية أو البحث بكلمة أخرى.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination footer */}
@@ -231,88 +336,96 @@ export function PaymentsList() {
       <PaymentDetailSheet
         paymentId={activeId}
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={(next) => {
+          if (!next) closeDetail();
+        }}
       />
     </div>
   );
 }
 
-// ── Card ────────────────────────────────────────────────────────────────────────
+// ── Columns ────────────────────────────────────────────────────────────────────
 
-function PaymentCard({
-  payment,
-  onOpen,
-}: {
-  payment: PaymentWithRelations;
-  onOpen: () => void;
-}) {
-  const userName = getUserDisplayName(payment.user);
-
-  return (
-    <Card
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      className="hover:border-border/80 hover:bg-muted/30 cursor-pointer gap-0 py-0 transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
-    >
-      <div className="flex flex-col gap-3 p-4">
-        {/* Header: user + status */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="bg-brand/10 text-brand flex size-8 shrink-0 items-center justify-center rounded-md">
-              <UserIcon className="size-4" />
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <p className="truncate text-sm font-semibold" title={userName}>
-                {userName}
-              </p>
-              <p className="text-muted-foreground truncate text-xs">
-                {payment.user?.username
-                  ? `@${payment.user.username}`
-                  : payment.user?.telegramUserId != null
-                    ? `Telegram #${payment.user.telegramUserId}`
-                    : "—"}
-              </p>
-            </div>
-          </div>
-          <PaymentStatusBadge status={payment.status} />
-        </div>
-
-        {/* Amount + method */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Wallet className="text-muted-foreground size-4 shrink-0" />
-            <span className="text-lg font-semibold tabular-nums">
-              {formatPrice(payment.amount, payment.currency)}
+function buildColumns(): ColumnDef<PaymentWithRelations>[] {
+  return [
+    {
+      id: "user",
+      header: "المستخدم",
+      cell: ({ row }) => {
+        const user = row.original.user;
+        const name = getUserDisplayName(user);
+        return (
+          <div className="flex min-w-[14ch] flex-col gap-0.5">
+            <span className="truncate text-sm font-medium" title={name}>
+              {name}
+            </span>
+            <span className="text-muted-foreground truncate text-xs">
+              {user?.username
+                ? `@${user.username}`
+                : user?.telegramUserId != null
+                  ? `#${user.telegramUserId}`
+                  : DASH}
             </span>
           </div>
-          <span className="text-muted-foreground rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase">
-            {payment.method}
+        );
+      },
+    },
+    {
+      id: "amount",
+      header: "المبلغ",
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold tabular-nums">
+          {formatPrice(row.original.amount, row.original.currency)}
+        </span>
+      ),
+    },
+    {
+      id: "method",
+      header: "الطريقة",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase">
+          {row.original.method}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "الحالة",
+      cell: ({ row }) => <PaymentStatusBadge status={row.original.status} />,
+    },
+    {
+      id: "transactionReference",
+      header: "المرجع",
+      cell: ({ row }) => {
+        const ref = row.original.transactionReference;
+        return ref ? (
+          <span
+            className="text-muted-foreground truncate font-mono text-xs"
+            title={ref}
+          >
+            #{ref}
           </span>
-        </div>
-
-        {/* Date */}
-        <div className="text-muted-foreground flex items-center justify-between gap-2 border-t pt-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="size-3.5" />
-            <span>{formatDateTime(payment.createdAt)}</span>
-          </div>
-          {payment.transactionReference && (
-            <span
-              className="truncate font-mono text-[10px]"
-              title={payment.transactionReference}
-            >
-              #{payment.transactionReference}
-            </span>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
+        ) : (
+          <span className="text-muted-foreground text-xs">{DASH}</span>
+        );
+      },
+    },
+    {
+      id: "createdAt",
+      header: "أُنشئت",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {formatDateTime(row.original.createdAt)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "إجراءات",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <PaymentActions payment={row.original} variant="inline" />
+      ),
+    },
+  ];
 }

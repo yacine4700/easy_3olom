@@ -699,3 +699,96 @@ Task: Add a new "Subscriptions & Users" section. Reuses the established vertical
 - READ-ONLY across the whole stack: real Supabase SELECTs only, no writes. Stats use `head:true` count queries (cheap SQL COUNTs) + one column-select for revenue sum.
 - Joins via Supabase nested selects (`*, user:users(*), plan:plans(*)` for subscriptions; `*, user:users(*), subscription:subscriptions(*, plan:plans(*))` for payment detail). Cross-table search uses PostgREST dotted-notation OR filters.
 - 5 of 9 nav items now live in the engagement group (student-questions, exercises, subscriptions, analytics, plus the dashboard is in overview). Module is ready for browser verification.
+
+---
+Task ID: SUBS-IMPROVE
+Agent: sub-agent (general-purpose)
+Task: Improve the Subscriptions module UX/UI — drop URL-coupled tab state, convert card lists to TanStack data tables, add Plans + Users read-only tabs, route payment approve/reject through the webhook (no DB writes), extend the webhook service to cover payments/plans/subscriptions and approve/reject/activate/suspend/cancel/renew actions.
+
+Work Log:
+
+#### 1. Webhook service extension (`src/lib/webhook.ts`)
+- Extended `WebhookEntity` from `"knowledge" | "methodology" | "glossary"` to also accept `"payment" | "plan" | "subscription" | "user"`.
+- Extended `WebhookAction` from `"create" | "update" | "delete"` to also accept `"approve" | "reject" | "activate" | "suspend" | "cancel" | "renew"`.
+- Added `notifyWebhookAction(entity, action, data)` convenience wrapper that always sends the payload as `{ entity, action, data }`. Existing `notifyWebhook` (which keeps the `delete` → `{ id }` special-case) is unchanged so existing callers in knowledge-base / methodology / glossary services still work.
+
+#### 2. Subscriptions service (`src/lib/services/subscriptions.ts`)
+- Imported `notifyWebhookAction` and `WebhookAction` from the webhook module.
+- Added `listPlans(query)`: paginated SELECT on `plans` with optional `search` (matches `code` / `name` via OR ilike) and `active` (boolean) filter. Returns `{ items, total, page, pageSize }`.
+- Added `listUsers(query)`: paginated SELECT on `users` with `search` (matches `username` / `first_name` / `last_name` via OR ilike) and `status` filter. Same shape.
+- Added `reviewPayment(id, action)`: reads the payment row (no joins) and forwards it to the webhook as `{ entity: "payment", action: "approve"|"reject", data: { id, userId, subscriptionId, amount, currency, method, status, transactionReference, telegramFileId, notes } }`. Throws an `Error` with the webhook's failure message so the API route can surface it as 400.
+- All new functions are READ-ONLY on the DB — `reviewPayment` only reads the row (so the webhook payload has full context) and forwards the action; it never INSERTs/UPDATEs/DELETEs the `payments` table.
+
+#### 3. Validators (`src/lib/validators/subscriptions.ts`)
+- Added `listPlansQuerySchema` (`search`, `active: enum["true","false"].optional().transform(to boolean|undefined)`, `sort`, `page`, `pageSize`).
+- Added `listUsersQuerySchema` (`search`, `status: enum["active","blocked"].optional()`, `sort`, `page`, `pageSize`).
+- Added `reviewPaymentSchema` (`{ action: "approve" | "reject" }`) for the POST review endpoint body.
+- Existing `listSubscriptionsQuerySchema` and `listPaymentsQuerySchema` unchanged.
+
+#### 4. API routes (3 new files)
+- `src/app/api/plans/route.ts` — GET only. Validates with `listPlansQuerySchema`, calls `listPlans`, returns `ok(...)`. No POST/PATCH/DELETE (plans are managed from the bot side).
+- `src/app/api/users-list/route.ts` — GET only. Named `users-list` (not `users`) to avoid colliding with auth conventions on `/api/users`. Validates with `listUsersQuerySchema`, calls `listUsers`.
+- `src/app/api/payments/[id]/review/route.ts` — POST. Body `{ action: "approve" | "reject" }` validated by `reviewPaymentSchema`. Calls `reviewPayment(id, action)` which forwards to the webhook. Returns 204 on success. Distinguishes webhook/validation errors (400) from unexpected server errors (500).
+
+#### 5. TanStack Query hooks (`src/hooks/queries/use-subscriptions.ts`)
+- Added `planKeys` + `userKeys` query-key factories.
+- Added `usePlans(query)` / `useUsers(query)` for the new read-only lists.
+- Added `useReviewPayment()` mutation. Posts to `/api/payments/[id]/review`. On success invalidates the payments lists, the open payment detail, and the dashboard stats so the UI refreshes. Callers use `mutateAsync` + try/catch to surface the error toast (the `ApiError.message` is user-ready Arabic).
+- Removed the unused `ApiError` import (no longer needed since the toast is shown in the calling component, not in the hook).
+- Existing `useSubscriptionStats`, `useSubscriptions`, `useSubscriptionDetail`, `usePayments`, `usePaymentDetail` unchanged.
+
+#### 6. Dashboard → Client Component (`src/components/subscriptions/subscriptions-dashboard.tsx`)
+- Converted from Server Component to `"use client"` Client Component.
+- Now fetches the KPI counts via `useSubscriptionStats()` (same data shape, same single round-trip — just one fewer server boundary).
+- KPI cards are now `<button>` elements (not `<Link>`). Clicking calls `onNavigate({ tab, status? })` — no URL change.
+- Exported `SubscriptionsTab` and `DashboardNavigateIntent` (discriminated union: `{ tab: "overview"|"users"|"plans" } | { tab: "subscriptions"; status: SubscriptionStatus } | { tab: "payments"; status: PaymentStatus }`) for the page client to consume.
+- Loading skeleton (7 placeholder cards) while the stats query is pending.
+
+#### 7. Subscriptions list → TanStack Table (`src/components/subscriptions/subscriptions-list.tsx`)
+- Replaced the card grid with a TanStack Table built on the shadcn `Table` primitives (same pattern as `knowledge-base/documents-table.tsx`).
+- Columns: المستخدم (name + @username/#telegram_id) / الخطة (name + code) / السعر (formatted price) / الحالة (badge) / البداية / النهاية / أُنشئ.
+- Toolbar unchanged: debounced search + status Select + sort Select + Clear button. Server-side filters (search/status/sort) and server-side pagination via `ListPagination`.
+- Status filter is now CONTROLLED by the parent (`statusFilter` / `onStatusFilterChange` props) so the page can preset it when the user clicks a KPI card.
+- Row click (and Enter/Space keyboard) → opens the existing `SubscriptionDetailSheet`.
+- Loading skeleton (6 placeholder rows) + empty state (Inbox icon) preserved.
+
+#### 8. Payments list → TanStack Table + action buttons (`src/components/subscriptions/payments-list.tsx` + `payment-actions.tsx`)
+- Replaced the card grid with a TanStack Table. Columns: المستخدم / المبلغ / الطريقة (CCP mono badge) / الحالة (badge) / المرجع (#transaction_reference) / أُنشئت / إجراءات.
+- Status filter is CONTROLLED by the parent (same pattern as subscriptions).
+- New "إجراءات" column renders `<PaymentActions payment={...} variant="inline" />` — only for `pending` payments; the cell is empty for `approved`/`rejected`/`cancelled` rows. The cell's `onClick` stops propagation so clicking an action button doesn't open the row's detail Sheet.
+- New `payment-actions.tsx` component: two `AlertDialog`-wrapped buttons (قبول = emerald, رفض = red). On confirm: shows a loading toast, calls `useReviewPayment().mutateAsync`, on success shows a "تم الإرسال إلى Webhook" toast and (when used in the Sheet) calls `onDone` to close the drawer; on error surfaces the `ApiError.message` as an error toast.
+- Updated `payment-detail.tsx` Sheet: when the payment is `pending`, a footer block ("إجراءات المراجعة") renders `<PaymentActions payment={data} variant="block" onDone={() => onOpenChange(false)} />` — full-width buttons, closes the Sheet on success.
+
+#### 9. Plans tab (`src/components/subscriptions/plans-list.tsx`)
+- New read-only TanStack Table. Columns: الرمز (code, mono uppercase) / الاسم / السعر / المدة (`{n} يومًا`) / الحالة (`ActiveBadge` — emerald "نشطة" / zinc "غير نشطة").
+- Toolbar: debounced search (matches code/name) + active filter Select (all / نشطة / غير نشطة) + sort Select + Clear button. Server-side filters + pagination via `ListPagination`.
+- NO add/edit/delete buttons — strictly display, per the spec.
+
+#### 10. Users tab (`src/components/subscriptions/users-list.tsx`)
+- New read-only TanStack Table. Columns: معرّف تيليجرام (`#telegram_user_id`, mono) / اسم المستخدم (`@username`) / الاسم (first + last, falls back to display name) / الحالة (UserStatusBadge) / أُنشئ / آخر ظهور.
+- Toolbar: debounced search (matches username/first_name/last_name) + status filter Select (all / نشط / محظور) + sort Select + Clear button. Server-side filters + pagination.
+- Read-only.
+
+#### 11. Page client (`src/components/subscriptions/subscriptions-page-client.tsx`)
+- Tabs now: نظرة عامة | المستخدمون | الاشتراكات | المدفوعات | الخطط.
+- All tab switching via local React state — NO `searchParams` reading, NO URL changes.
+- Lifted the subscriptions tab's `statusFilter` and the payments tab's `statusFilter` into the page so KPI cards can preset them via `handleNavigate({ tab, status })`.
+- `handleNavigate` uses the discriminated union to set the matching filter when the tab is `subscriptions` or `payments`.
+- Renders `<SubscriptionsDashboard onNavigate={handleNavigate} />` in the overview tab — no more server-side dashboard prop (the dashboard fetches its own stats client-side now).
+
+#### 12. Page (`src/app/(admin)/subscriptions/page.tsx`)
+- Removed the `searchParams` Promise entirely.
+- No longer awaits `SubscriptionsDashboard()` server-side.
+- Just renders `<SubscriptionsPageClient />` directly.
+
+### Conventions maintained
+- READ-ONLY on the DB. The only writes go through the webhook service. The new `reviewPayment` function does a SELECT to compose the webhook payload, then forwards to the webhook — never INSERT/UPDATE/DELETE on `payments`.
+- Arabic strings throughout, RTL inherited from `<html dir="rtl">`, logical CSS properties used (`ps-8`, `start-2.5`, `text-start`, `text-end`). No new UI primitives added — reused the existing shadcn `Table`, `Sheet`, `AlertDialog`, `Badge`, `Select`, `Skeleton`, `Button`, `Input`.
+- Existing read functions and types preserved — no breaking changes to `useSubscriptions`, `usePayments`, `useSubscriptionDetail`, `usePaymentDetail`, `useSubscriptionStats`, or the existing API routes.
+- Existing webhook callers in `glossary.ts` / `knowledge-base.ts` continue to work because `notifyWebhook` semantics for `create`/`update`/`delete` are unchanged.
+- Did NOT run lint or dev server per instructions.
+
+### Stage Summary
+- Subscriptions module upgraded: card grids → TanStack Tables (subscriptions + payments + 2 new read-only tables for plans + users); URL-coupled tab state replaced with local React state; payment approve/reject actions routed through the webhook via a new POST `/api/payments/[id]/review` endpoint + AlertDialog confirmation flow; webhook service extended to cover the new entities + actions.
+- Net new files: 5 (`payment-actions.tsx`, `plans-list.tsx`, `users-list.tsx`, `src/app/api/plans/route.ts`, `src/app/api/users-list/route.ts`, `src/app/api/payments/[id]/review/route.ts`).
+- Net modified files: 6 (`webhook.ts`, `services/subscriptions.ts`, `validators/subscriptions.ts`, `use-subscriptions.ts`, `subscriptions-dashboard.tsx`, `subscriptions-list.tsx`, `payments-list.tsx`, `payment-detail.tsx`, `subscriptions-page-client.tsx`, `subscriptions/page.tsx`).

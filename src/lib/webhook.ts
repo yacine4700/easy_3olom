@@ -1,7 +1,24 @@
 import { supabase } from "@/lib/supabase";
 
-export type WebhookEntity = "knowledge" | "methodology" | "glossary";
-export type WebhookAction = "create" | "update" | "delete";
+export type WebhookEntity =
+  | "knowledge"
+  | "methodology"
+  | "glossary"
+  | "payment"
+  | "plan"
+  | "subscription"
+  | "user";
+
+export type WebhookAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "approve"
+  | "reject"
+  | "activate"
+  | "suspend"
+  | "cancel"
+  | "renew";
 
 export interface WebhookResult {
   success: boolean;
@@ -62,4 +79,25 @@ export async function notifyWebhook(
   } catch (error) {
     return { success: false, error: `فشل إرسال Webhook: ${error instanceof Error ? error.message : "خطأ"}` };
   }
+}
+
+/**
+ * Convenience wrapper that always sends the payload as `data`.
+ *
+ * Used for domain actions that aren't CRUD (e.g. payment.approve,
+ * subscription.suspend). The body shape mirrors `notifyWebhook` for non-delete
+ * actions so the receiving end can use a single parser:
+ *
+ *   { entity: "payment", action: "approve", data: { id, ...fields } }
+ *
+ * Provided as a separate export so call sites read more naturally:
+ *
+ *   await notifyWebhookAction("payment", "approve", { id, ... });
+ */
+export async function notifyWebhookAction(
+  entity: WebhookEntity,
+  action: WebhookAction,
+  data: Record<string, unknown>,
+): Promise<WebhookResult> {
+  return notifyWebhook(entity, action, data);
 }
