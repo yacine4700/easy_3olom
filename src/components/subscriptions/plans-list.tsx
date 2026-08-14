@@ -7,9 +7,10 @@ import {
   Inbox,
   Loader2,
   Pencil,
+  Plus,
   Search,
   Tag,
-  Wallet,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -36,8 +37,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { usePlans } from "@/hooks/queries/use-subscriptions";
-import { useUpdatePlan } from "@/hooks/queries/use-plans";
+import { useCreatePlan, useUpdatePlan, useDeletePlan } from "@/hooks/queries/use-plans";
 import { formatPrice } from "@/components/subscriptions/format";
 import type { Plan } from "@/types/subscriptions";
 
@@ -58,11 +69,22 @@ const DEFAULT_FILTERS: PlansFilters = {
 
 const PAGE_SIZE = 12;
 
+const EMPTY_FORM = {
+  name: "",
+  code: "",
+  description: "",
+  price: "",
+  durationDays: "",
+  active: true,
+};
+
 export function PlansList() {
   const [filters, setFilters] = React.useState<PlansFilters>(DEFAULT_FILTERS);
   const [page, setPage] = React.useState(1);
   const [pageSize] = React.useState(PAGE_SIZE);
   const [editingPlan, setEditingPlan] = React.useState<Plan | null>(null);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<Plan | null>(null);
 
   const [debouncedSearch, setDebouncedSearch] = React.useState(filters.search);
   React.useEffect(() => {
@@ -151,6 +173,14 @@ export function PlansList() {
             مسح
           </Button>
         )}
+
+        <Button
+          onClick={() => setCreateOpen(true)}
+          className="bg-brand text-brand-foreground hover:bg-brand/90 h-9 shrink-0"
+        >
+          <Plus className="size-4" />
+          إضافة خطة
+        </Button>
       </div>
 
       {/* Cards grid */}
@@ -172,7 +202,12 @@ export function PlansList() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} onEdit={() => setEditingPlan(plan)} />
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                onEdit={() => setEditingPlan(plan)}
+                onDelete={() => setDeleteTarget(plan)}
+              />
             ))}
           </div>
         )}
@@ -193,15 +228,48 @@ export function PlansList() {
         </div>
       )}
 
+      {/* Create dialog */}
+      <CreatePlanDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+
       {/* Edit dialog */}
       <EditPlanDialog plan={editingPlan} onClose={() => setEditingPlan(null)} />
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الخطة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف &quot;{deleteTarget?.name}&quot; نهائياً. لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <DeletePlanAction
+              plan={deleteTarget}
+              onDone={() => setDeleteTarget(null)}
+            />
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 // ── Plan Card ───────────────────────────────────────────────────────────────
 
-function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
+function PlanCard({
+  plan,
+  onEdit,
+  onDelete,
+}: {
+  plan: Plan;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   return (
     <Card className="hover:border-border/80 gap-0 overflow-hidden py-0 transition-colors">
       <CardContent className="space-y-4 p-5">
@@ -219,7 +287,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
           <ActiveBadge active={plan.active} />
         </div>
 
-        {/* Price + duration — prominent */}
+        {/* Price + duration */}
         <div className="flex items-end justify-between gap-2 border-y py-3">
           <div>
             <p className="text-2xl font-bold tabular-nums">
@@ -240,11 +308,21 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
           </p>
         ) : null}
 
-        {/* Edit button */}
-        <Button variant="outline" size="sm" className="w-full" onClick={onEdit}>
-          <Pencil className="size-3.5" />
-          تعديل
-        </Button>
+        {/* Actions */}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
+            <Pencil className="size-3.5" />
+            تعديل
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -264,23 +342,150 @@ function ActiveBadge({ active }: { active: boolean }) {
   );
 }
 
+// ── Shared form fields ─────────────────────────────────────────────────────
+
+function PlanFormFields({
+  form,
+  setForm,
+}: {
+  form: typeof EMPTY_FORM;
+  setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="plan-name">اسم الخطة</Label>
+        <Input
+          id="plan-name"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="plan-code">الرمز</Label>
+        <Input
+          id="plan-code"
+          value={form.code}
+          onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+          className="font-mono uppercase"
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="plan-price">السعر (DZD)</Label>
+          <Input
+            id="plan-price"
+            type="number"
+            min={0}
+            value={form.price}
+            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="plan-duration">المدة (أيام)</Label>
+          <Input
+            id="plan-duration"
+            type="number"
+            min={1}
+            value={form.durationDays}
+            onChange={(e) => setForm((f) => ({ ...f, durationDays: e.target.value }))}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="plan-desc">الوصف</Label>
+        <Textarea
+          id="plan-desc"
+          value={form.description}
+          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          rows={2}
+          placeholder="وصف الخطة (اختياري)"
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="space-y-0.5">
+          <Label htmlFor="plan-active" className="text-sm">الخطة نشطة</Label>
+          <p className="text-muted-foreground text-xs">عند التعطيل لن تظهر للمستخدمين</p>
+        </div>
+        <Switch
+          id="plan-active"
+          checked={form.active}
+          onCheckedChange={(checked) => setForm((f) => ({ ...f, active: checked }))}
+        />
+      </div>
+    </>
+  );
+}
+
+// ── Create Plan Dialog ──────────────────────────────────────────────────────
+
+function CreatePlanDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const createMutation = useCreatePlan();
+  const [form, setForm] = React.useState(EMPTY_FORM);
+
+  React.useEffect(() => {
+    if (open) setForm(EMPTY_FORM);
+  }, [open]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    createMutation.mutate(
+      {
+        name: form.name,
+        code: form.code,
+        description: form.description || null,
+        price: Number(form.price),
+        durationDays: Number(form.durationDays),
+        active: form.active,
+      },
+      { onSuccess: () => onClose() },
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>إضافة خطة جديدة</DialogTitle>
+          <DialogDescription>أدخل بيانات الخطة الجديدة.</DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <PlanFormFields form={form} setForm={setForm} />
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              {createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              إنشاء الخطة
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Edit Plan Dialog ────────────────────────────────────────────────────────
 
 function EditPlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => void }) {
   const open = plan !== null;
   const updateMutation = useUpdatePlan();
 
-  // Local form state
-  const [form, setForm] = React.useState({
-    name: "",
-    code: "",
-    description: "",
-    price: "",
-    durationDays: "",
-    active: true,
-  });
+  const [form, setForm] = React.useState(EMPTY_FORM);
 
-  // Sync form when plan changes
   React.useEffect(() => {
     if (plan) {
       setForm({
@@ -310,11 +515,7 @@ function EditPlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => v
           active: form.active,
         },
       },
-      {
-        onSuccess: () => {
-          onClose();
-        },
-      },
+      { onSuccess: () => onClose() },
     );
   }
 
@@ -323,94 +524,21 @@ function EditPlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => v
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>تعديل الخطة</DialogTitle>
-          <DialogDescription>
-            تعديل بيانات الخطة. يتم الحفظ عبر Webhook.
-          </DialogDescription>
+          <DialogDescription>تعديل بيانات الخطة مباشرة في قاعدة البيانات.</DialogDescription>
         </DialogHeader>
 
         {plan && (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="plan-name">اسم الخطة</Label>
-              <Input
-                id="plan-name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="plan-code">الرمز</Label>
-              <Input
-                id="plan-code"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                className="font-mono uppercase"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="plan-price">السعر (DZD)</Label>
-                <Input
-                  id="plan-price"
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="plan-duration">المدة (أيام)</Label>
-                <Input
-                  id="plan-duration"
-                  type="number"
-                  min={1}
-                  value={form.durationDays}
-                  onChange={(e) => setForm((f) => ({ ...f, durationDays: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="plan-desc">الوصف</Label>
-              <Textarea
-                id="plan-desc"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                rows={2}
-                placeholder="وصف الخطة (اختياري)"
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div className="space-y-0.5">
-                <Label htmlFor="plan-active" className="text-sm">الخطة نشطة</Label>
-                <p className="text-muted-foreground text-xs">عند التعطيل لن تظهر للمستخدمين</p>
-              </div>
-              <Switch
-                id="plan-active"
-                checked={form.active}
-                onCheckedChange={(checked) => setForm((f) => ({ ...f, active: checked }))}
-              />
-            </div>
+            <PlanFormFields form={form} setForm={setForm} />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
-                إلغاء
-              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
               <Button
                 type="submit"
                 disabled={updateMutation.isPending}
                 className="bg-brand text-brand-foreground hover:bg-brand/90"
               >
-                {updateMutation.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
+                {updateMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
                 حفظ التغييرات
               </Button>
             </DialogFooter>
@@ -418,5 +546,27 @@ function EditPlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => v
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Delete Plan Action ───────────────────────────────────────────────────────
+
+function DeletePlanAction({ plan, onDone }: { plan: Plan | null; onDone: () => void }) {
+  const deleteMutation = useDeletePlan();
+
+  return (
+    <AlertDialogAction
+      className="bg-destructive text-white hover:bg-destructive/90"
+      disabled={deleteMutation.isPending || !plan}
+      onClick={() => {
+        if (plan) {
+          deleteMutation.mutate(plan.id, { onSuccess: () => onDone() });
+        }
+      }}
+    >
+      {deleteMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+      <Trash2 className="size-4" />
+      حذف
+    </AlertDialogAction>
   );
 }

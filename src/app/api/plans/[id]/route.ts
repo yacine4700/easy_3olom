@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabase } from "@/lib/supabase";
-import { notifyWebhookAction } from "@/lib/webhook";
-import { badRequest, notFound, ok, serverError } from "@/lib/api";
+import { ok, badRequest, notFound, serverError, noContent } from "@/lib/api";
 import { z } from "zod";
 
 function isValidId(id: string) {
@@ -18,10 +17,7 @@ const updatePlanSchema = z.object({
   active: z.boolean(),
 });
 
-/**
- * GET /api/plans/[id]
- * READ-ONLY — fetches a single plan.
- */
+/** GET /api/plans/[id] */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -44,15 +40,7 @@ export async function GET(
   }
 }
 
-/**
- * PATCH /api/plans/[id]
- *
- * Does NOT write to the database directly. Instead:
- * 1. Reads the existing plan (SELECT — for the webhook payload context)
- * 2. Sends the update via the webhook: { entity: "plan", action: "update", data }
- * 3. Returns the submitted data (not the DB record — the webhook hasn't
- *    processed yet; the UI refreshes via query invalidation)
- */
+/** PATCH /api/plans/[id] — direct DB update */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -71,19 +59,49 @@ export async function PATCH(
     const [parsed, errorResponse] = validateBody(updatePlanSchema, body);
     if (errorResponse) return errorResponse;
 
-    // Send to webhook — NO direct DB write
-    const result = await notifyWebhookAction("plan", "update", {
-      id,
-      ...parsed,
-    });
+    const { data, error } = await supabase
+      .from("plans")
+      .update({
+        name: parsed.name,
+        code: parsed.code,
+        description: parsed.description ?? null,
+        price: parsed.price,
+        duration_days: parsed.durationDays,
+        active: parsed.active,
+      })
+      .eq("id", id)
+      .select()
+      .single();
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
+    if (!data) return notFound("Plan not found");
 
-    return ok({ id, ...parsed });
+    return ok(data);
   } catch (error) {
     console.error("[API] PATCH /api/plans/[id] failed:", error);
+    return serverError();
+  }
+}
+
+/** DELETE /api/plans/[id] — direct DB delete */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    if (!isValidId(id)) return badRequest("Invalid id");
+
+    const { error } = await supabase.from("plans").delete().eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return noContent();
+  } catch (error) {
+    console.error("[API] DELETE /api/plans/[id] failed:", error);
     return serverError();
   }
 }
