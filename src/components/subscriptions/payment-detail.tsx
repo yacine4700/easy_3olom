@@ -8,12 +8,18 @@ import {
   FileText,
   Hash,
   Image as ImageIcon,
+  ExternalLink,
   Receipt,
   Stamp,
   User as UserIcon,
   Wallet,
 } from "lucide-react";
-
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -54,6 +60,7 @@ export function PaymentDetailSheet({
   open,
   onOpenChange,
 }: PaymentDetailSheetProps) {
+  const [proofOpen, setProofOpen] = React.useState(false);
   const { data, isLoading } = usePaymentDetail(
     open ? paymentId : null,
   );
@@ -213,18 +220,54 @@ export function PaymentDetailSheet({
               )}
             </DetailSection>
 
-            {/* Telegram file */}
-            <DetailSection title="ملف الإيصال" icon={ImageIcon}>
-              {data.telegramFileId ? (
-                <p className="text-muted-foreground font-mono text-xs break-all">
-                  {data.telegramFileId}
-                </p>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  لا يوجد ملف إيصال مرتبط.
-                </p>
-              )}
-            </DetailSection>
+            {/* Payment proof */}
+<DetailSection title="إثبات الدفع" icon={ImageIcon}>
+  {data.proofFilename ? (
+    <div className="space-y-3">
+      <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
+        <span className="font-mono break-all">
+          {data.proofFilename}
+        </span>
+
+        <ExternalLink className="size-4 shrink-0" />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setProofOpen(true)}
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+      >
+        عرض إثبات الدفع
+      </button>
+    </div>
+  ) : (
+    <p className="text-muted-foreground text-sm">
+      لا يوجد إثبات دفع مرفق.
+    </p>
+  )}
+</DetailSection>
+
+<Dialog open={proofOpen} onOpenChange={setProofOpen}>
+  <DialogContent className="max-w-3xl">
+    <DialogHeader>
+      <DialogTitle>إثبات الدفع</DialogTitle>
+    </DialogHeader>
+
+    <div className="flex max-h-[75vh] items-center justify-center overflow-auto rounded-lg bg-muted/20 p-2">
+      {data.proofFilename ? (
+        <img
+          src={`/api/payments/${data.id}/proof`}
+          alt="إثبات الدفع"
+          className="max-h-[70vh] w-auto max-w-full rounded-md object-contain"
+        />
+      ) : (
+        <p className="text-muted-foreground py-12 text-sm">
+          لا يوجد إثبات دفع.
+        </p>
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
 
             {/* Review actions (only for pending payments) */}
             {data.status === "pending" && (

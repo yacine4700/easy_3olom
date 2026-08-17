@@ -89,6 +89,7 @@ export interface Payment {
   method: PaymentMethod;
   status: PaymentStatus;
   telegramFileId: string | null;
+  proofFilename: string | null;
   transactionReference: string | null;
   notes: string | null;
   reviewedBy: string | null;

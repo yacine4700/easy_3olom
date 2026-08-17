@@ -21,6 +21,8 @@ import { checkSupabaseConnection } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "الإعدادات" };
+export const dynamic = "force-dynamic";
+
 
 /** SQL a fresh Supabase project needs before this page can persist changes. */
 const SETTINGS_TABLE_SQL = `create table if not exists public.settings (

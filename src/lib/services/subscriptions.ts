@@ -75,6 +75,7 @@ type SubscriptionRow = {
 
 type PaymentRow = {
   id: string;
+  payment_reference: string;
   user_id: string;
   subscription_id: string | null;
   amount: number | string | null;
@@ -82,6 +83,7 @@ type PaymentRow = {
   method: string | null;
   status: string | null;
   telegram_file_id: string | null;
+  proof_filename: string | null;
   transaction_reference: string | null;
   notes: string | null;
   reviewed_by: string | null;
@@ -143,6 +145,7 @@ function toPayment(r: PaymentRow): Payment {
     method: (r.method as Payment["method"]) ?? "ccp",
     status: (r.status as Payment["status"]) ?? "pending",
     telegramFileId: r.telegram_file_id,
+    proofFilename: r.proof_filename,
     transactionReference: r.transaction_reference,
     notes: r.notes,
     reviewedBy: r.reviewed_by,
@@ -551,9 +554,19 @@ export async function reviewPayment(
   if (!row) {
     throw new Error("المدفوعة غير موجودة");
   }
+const { data: telegramUser, error: telegramUserError } =
+  await supabase
+    .from(USERS_TABLE)
+    .select("telegram_user_id")
+    .eq("id", row.user_id)
+    .single();
 
+if (telegramUserError || !telegramUser) {
+  throw new Error("مستخدم تيليجرام غير موجود");
+}
   const data: Record<string, unknown> = {
     id,
+    paymentReference: row.payment_reference,
     userId: row.user_id,
     subscriptionId: row.subscription_id,
     amount: Number(row.amount ?? 0),
@@ -563,6 +576,7 @@ export async function reviewPayment(
     transactionReference: row.transaction_reference,
     telegramFileId: row.telegram_file_id,
     notes: row.notes,
+    telegramUserId: telegramUser.telegram_user_id,
   };
 
   const result = await notifyWebhookAction("payment", action, data);
